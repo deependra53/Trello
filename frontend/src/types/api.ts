@@ -106,6 +106,11 @@ export interface Card {
   watchers?: string[];
   votes?: string[];
   archived?: boolean;
+  location?: { lat?: number; lng?: number; label?: string } | null;
+  scheduledAt?: string | null;
+  scheduledDuration?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Label {
