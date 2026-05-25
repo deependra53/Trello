@@ -119,6 +119,17 @@
     background-color: hsl(var(--border));
     border-radius: 9999px;
   }
+
+  /* Drag-and-drop cursors + touch handling. */
+  .drag-handle {
+    cursor: grab;
+    touch-action: none;
+  }
+  .drag-handle:active,
+  [data-rbd-dragging='true'] .drag-handle,
+  [data-rbd-dragging='true'] {
+    cursor: grabbing;
+  }
 }
 
 /* Smooth scrolling */

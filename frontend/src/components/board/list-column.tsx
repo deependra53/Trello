@@ -30,7 +30,7 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
         >
           <div
             {...provided.dragHandleProps}
-            className="mb-2 flex items-center justify-between px-1.5"
+            className="drag-handle mb-2 flex items-center justify-between px-1.5"
           >
             <h3 className="text-sm font-semibold">{list.title}</h3>
             <div className="flex items-center gap-1">
@@ -49,8 +49,8 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
                 ref={dropProvided.innerRef}
                 {...dropProvided.droppableProps}
                 className={cn(
-                  'flex flex-1 flex-col gap-2 overflow-y-auto rounded-md p-1 scrollbar-thin transition-colors',
-                  dropSnapshot.isDraggingOver && 'bg-accent/40',
+                  'flex min-h-[40px] flex-1 flex-col gap-2 overflow-y-auto rounded-md p-1 scrollbar-thin transition-colors',
+                  dropSnapshot.isDraggingOver && 'bg-accent/40 ring-2 ring-primary/30',
                 )}
               >
                 {cards.map((card, i) => (
@@ -60,6 +60,7 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
                         ref={cardProvided.innerRef}
                         {...cardProvided.draggableProps}
                         {...cardProvided.dragHandleProps}
+                        className="drag-handle"
                       >
                         <CardTile
                           card={card}

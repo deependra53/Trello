@@ -43,8 +43,8 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
       type="button"
       onClick={onOpen}
       className={cn(
-        'w-full overflow-hidden rounded-lg bg-card text-left shadow-soft transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary',
-        isDragging && 'rotate-2 scale-[1.02] shadow-glow',
+        'w-full overflow-hidden rounded-lg bg-card text-left shadow-soft transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary',
+        isDragging && 'rotate-2 ring-2 ring-primary/60 shadow-glow',
       )}
     >
       {coverColor && <div className="h-8" style={{ backgroundColor: coverColor }} />}
