@@ -6,7 +6,113 @@ import { Card } from '../models/card.model.js';
 import { NotFound } from '../utils/errors.js';
 import { logActivity } from './activity.service.js';
 
+const DEFAULT_TEMPLATES = [
+  {
+    name: 'Sprint Board',
+    description: 'Plan and ship a two-week sprint.',
+    category: 'engineering',
+    background: { type: 'gradient', value: 'linear-gradient(135deg,#795DFF,#9B7BFF)' },
+    structure: {
+      lists: [
+        { title: 'Backlog', cards: [{ title: 'Refine ticket scope', description: '' }] },
+        { title: 'This Sprint', cards: [{ title: 'Kickoff meeting', description: '' }] },
+        { title: 'In Progress', cards: [] },
+        { title: 'Review', cards: [] },
+        { title: 'Done', cards: [] },
+      ],
+    },
+    isPublic: true,
+  },
+  {
+    name: 'Personal Kanban',
+    description: 'Get things done across the week.',
+    category: 'personal',
+    background: { type: 'color', value: '#22A186' },
+    structure: {
+      lists: [
+        { title: 'Inbox', cards: [{ title: 'Capture an idea' }] },
+        { title: 'Today', cards: [] },
+        { title: 'This Week', cards: [] },
+        { title: 'Waiting On', cards: [] },
+        { title: 'Done', cards: [] },
+      ],
+    },
+    isPublic: true,
+  },
+  {
+    name: 'Product Roadmap',
+    description: 'Communicate what is shipping and when.',
+    category: 'product',
+    background: { type: 'gradient', value: 'linear-gradient(135deg,#FF6B6B,#FFA8A8)' },
+    structure: {
+      lists: [
+        { title: 'Discovery' },
+        { title: 'Now' },
+        { title: 'Next' },
+        { title: 'Later' },
+        { title: 'Shipped' },
+      ],
+    },
+    isPublic: true,
+  },
+  {
+    name: 'Marketing Calendar',
+    description: 'Coordinate campaigns and launches.',
+    category: 'marketing',
+    background: { type: 'color', value: '#F2994A' },
+    structure: {
+      lists: [
+        { title: 'Ideas' },
+        { title: 'Drafts' },
+        { title: 'Scheduled' },
+        { title: 'Published' },
+      ],
+    },
+    isPublic: true,
+  },
+  {
+    name: 'Bug Tracker',
+    description: 'Triage and ship fixes faster.',
+    category: 'engineering',
+    background: { type: 'color', value: '#EB5757' },
+    structure: {
+      lists: [
+        { title: 'Reported' },
+        { title: 'Triage' },
+        { title: 'In Progress' },
+        { title: 'Verifying' },
+        { title: 'Closed' },
+      ],
+    },
+    isPublic: true,
+  },
+  {
+    name: 'Editorial Calendar',
+    description: 'Plan posts from draft to publish.',
+    category: 'content',
+    background: { type: 'color', value: '#2D9CDB' },
+    structure: {
+      lists: [
+        { title: 'Pitch' },
+        { title: 'Drafting' },
+        { title: 'Editing' },
+        { title: 'Scheduled' },
+        { title: 'Published' },
+      ],
+    },
+    isPublic: true,
+  },
+];
+
+async function ensureSeeded() {
+  const count = await Template.estimatedDocumentCount();
+  if (count === 0) {
+    await Template.insertMany(DEFAULT_TEMPLATES);
+  }
+}
+
 export async function list() {
+  await ensureSeeded().catch(() => undefined);
   return Template.find({ isPublic: true }).sort({ useCount: -1 }).lean();
 }
 

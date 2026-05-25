@@ -4,6 +4,7 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from '@/stores/auth';
+import { CommandPalette } from './command-palette';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <NextThemesProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <AuthHydrator>{children}</AuthHydrator>
+        <CommandPalette />
         <Toaster richColors position="top-right" />
       </QueryClientProvider>
     </NextThemesProvider>

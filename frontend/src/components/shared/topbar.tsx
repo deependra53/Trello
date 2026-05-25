@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bell, LogOut, Menu, Search, Settings, User as UserIcon } from 'lucide-react';
+import { LogOut, Menu, Search, Settings, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from './theme-toggle';
+import { NotificationsDropdown } from './notifications-dropdown';
 import { useAuthStore } from '@/stores/auth';
 import { useUIStore } from '@/stores/ui';
 import { getInitials } from '@/lib/utils';
@@ -64,9 +65,7 @@ export function TopBar() {
         <Search className="h-5 w-5" />
       </Button>
 
-      <Button variant="ghost" size="icon" aria-label="Notifications" className="relative md:ml-2">
-        <Bell className="h-5 w-5" />
-      </Button>
+      <NotificationsDropdown />
 
       <ThemeToggle />
 
