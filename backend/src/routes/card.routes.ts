@@ -16,6 +16,13 @@ import {
   updateChecklistItemSchema,
 } from '../validators/card.validator.js';
 import { commentSchema, updateCommentSchema, reactionSchema } from '../validators/misc.validator.js';
+import multer from 'multer';
+import * as uploadCtrl from '../controllers/upload.controller.js';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+});
 
 const router = Router();
 router.use(requireAuth);
@@ -119,6 +126,24 @@ router.post(
   requireCardAccess('admin', 'member', 'observer'),
   validate(reactionSchema),
   ctrl.reactToComment,
+);
+
+// Attachments
+router.post(
+  '/:id/attachments',
+  requireCardAccess('admin', 'member'),
+  upload.single('file'),
+  uploadCtrl.upload,
+);
+router.delete(
+  '/:cardId/attachments/:attachmentId',
+  requireCardAccess('admin', 'member'),
+  uploadCtrl.remove,
+);
+router.post(
+  '/:cardId/attachments/:attachmentId/cover',
+  requireCardAccess('admin', 'member'),
+  uploadCtrl.setCover,
 );
 
 export default router;

@@ -7,6 +7,7 @@ import { Notification } from '../models/notification.model.js';
 import { BadRequest, NotFound } from '../utils/errors.js';
 import { computePosition } from '../utils/position.js';
 import { logActivity } from './activity.service.js';
+import { emitUser } from '../realtime/bus.js';
 
 export async function getById(id: string) {
   const card = await Card.findById(id);
@@ -368,7 +369,7 @@ export async function addComment(
   }
   notifyUsers.delete(authorId);
   if (notifyUsers.size > 0) {
-    await Notification.insertMany(
+    const inserted = await Notification.insertMany(
       [...notifyUsers].map((uid) => ({
         userId: uid,
         actorId: authorId,
@@ -380,6 +381,13 @@ export async function addComment(
         link: `/boards/${card.boardId}/c/${card._id}`,
       })),
     );
+    for (const n of inserted) {
+      emitUser({
+        userId: String(n.userId),
+        type: 'notification.new',
+        payload: { notification: n.toJSON() },
+      });
+    }
   }
   return comment;
 }

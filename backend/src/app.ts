@@ -8,6 +8,7 @@ import { logger } from './config/logger.js';
 import { generalLimiter } from './middleware/rateLimit.middleware.js';
 import { notFoundHandler, errorHandler } from './middleware/error.middleware.js';
 import apiRoutes from './routes/index.js';
+import { LOCAL_UPLOADS_DIR } from './uploads/providers.js';
 
 export function createApp(): Express {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp(): Express {
     res.json({ status: 'ok', uptime: process.uptime() });
   });
 
+  app.use('/uploads', express.static(LOCAL_UPLOADS_DIR));
   app.use('/api', generalLimiter, apiRoutes);
 
   app.use(notFoundHandler);
