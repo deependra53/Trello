@@ -14,8 +14,12 @@ export const remove = asyncHandler<BoardRequest>(async (req, res) => {
 });
 
 export const move = asyncHandler<BoardRequest>(async (req, res) => {
-  const { prevId, nextId } = req.body as { prevId?: string | null; nextId?: string | null };
-  const l = await svc.move(req.params.id as string, prevId, nextId, req.user.sub);
+  const { prevId, nextId, clientEventId } = req.body as {
+    prevId?: string | null;
+    nextId?: string | null;
+    clientEventId: string;
+  };
+  const l = await svc.move(req.params.id as string, prevId, nextId, clientEventId, req.user.sub);
   res.json(l);
 });
 

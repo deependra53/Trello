@@ -50,7 +50,7 @@ describe('boards / lists / cards', () => {
     const res = await request(app)
       .post(`/api/cards/${card._id}/move`)
       .set('Authorization', `Bearer ${user.token}`)
-      .send({ listId: l2._id });
+      .send({ listId: l2._id, clientEventId: 'test-move-1' });
     expect(res.status).toBe(200);
     expect(res.body.listId).toBe(l2._id);
   });

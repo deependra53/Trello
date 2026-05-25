@@ -5,9 +5,14 @@ import { List } from '../models/list.model.js';
 import { Comment } from '../models/comment.model.js';
 import { Notification } from '../models/notification.model.js';
 import { BadRequest, NotFound } from '../utils/errors.js';
-import { computePosition } from '../utils/position.js';
+import {
+  computeBetween,
+  needsNormalize,
+  normalizeCardsInList,
+  STEP,
+} from '../utils/ordering.js';
 import { logActivity } from './activity.service.js';
-import { emitUser } from '../realtime/bus.js';
+import { emitBoard, emitUser } from '../realtime/bus.js';
 
 export async function getById(id: string) {
   const card = await Card.findById(id);
@@ -82,38 +87,74 @@ export async function remove(id: string, actorId: string) {
 export async function move(
   id: string,
   opts: {
-    listId?: string;
-    boardId?: string;
+    listId: string;
     prevId?: string | null;
     nextId?: string | null;
+    clientEventId: string;
     actorId: string;
   },
 ) {
   const card = await getById(id);
-  const fromList = card.listId;
-  if (opts.listId) card.listId = new Types.ObjectId(opts.listId);
-  if (opts.boardId) card.boardId = new Types.ObjectId(opts.boardId);
-  const targetList = String(card.listId);
-  const prevPos = opts.prevId
-    ? (await Card.findById(opts.prevId).lean())?.position ?? null
-    : null;
-  const nextPos = opts.nextId
-    ? (await Card.findById(opts.nextId).lean())?.position ?? null
-    : null;
-  if (prevPos == null && nextPos == null) {
-    card.position = await nextPosition(targetList);
-  } else {
-    card.position = computePosition(prevPos, nextPos);
+
+  if (opts.prevId === id || opts.nextId === id) {
+    throw BadRequest('A card cannot be its own neighbor');
   }
+
+  const targetList = await List.findById(opts.listId).lean();
+  if (!targetList) throw NotFound('Target list not found');
+  if (String(targetList.boardId) !== String(card.boardId)) {
+    throw BadRequest('Target list belongs to a different board');
+  }
+
+  const readNeighborPos = async (neighborId: string | null | undefined) => {
+    if (!neighborId) return null;
+    const n = await Card.findById(neighborId).lean();
+    if (!n) throw BadRequest('Neighbor card not found');
+    if (String(n.listId) !== String(opts.listId)) {
+      throw BadRequest('Neighbor is not in the target list');
+    }
+    return n.position ?? null;
+  };
+
+  const fromList = String(card.listId);
+  card.listId = new Types.ObjectId(opts.listId);
+
+  let prevPos = await readNeighborPos(opts.prevId);
+  let nextPos = await readNeighborPos(opts.nextId);
+
+  let normalized = false;
+  if (needsNormalize(prevPos, nextPos)) {
+    await normalizeCardsInList(opts.listId);
+    prevPos = await readNeighborPos(opts.prevId);
+    nextPos = await readNeighborPos(opts.nextId);
+    normalized = true;
+  }
+  card.position = computeBetween(prevPos, nextPos);
   await card.save();
+
   await logActivity({
     boardId: card.boardId,
     cardId: card._id,
     listId: card.listId,
     actorId: opts.actorId,
     type: 'card.moved',
-    payload: { fromList: String(fromList), toList: String(card.listId) },
+    payload: {
+      fromList,
+      toList: String(card.listId),
+      position: card.position,
+      clientEventId: opts.clientEventId,
+    },
   });
+
+  if (normalized) {
+    emitBoard({
+      boardId: String(card.boardId),
+      type: 'list.normalized',
+      actorId: opts.actorId,
+      payload: { listId: String(card.listId), clientEventId: opts.clientEventId },
+    });
+  }
+
   return card;
 }
 
@@ -461,5 +502,5 @@ async function nextPosition(listId: string): Promise<number> {
     .sort({ position: -1 })
     .select('position')
     .lean();
-  return (last?.position ?? 0) + 65_536;
+  return (last?.position ?? 0) + STEP;
 }

@@ -14,10 +14,16 @@ export const updateListSchema = z.object({
   sortBy: z.enum(['manual', 'createdAt', 'dueDate', 'title']).optional(),
 });
 
-export const moveListSchema = z.object({
-  prevId: objectIdSchema.nullable().optional(),
-  nextId: objectIdSchema.nullable().optional(),
-});
+export const moveListSchema = z
+  .object({
+    prevId: objectIdSchema.nullable().optional(),
+    nextId: objectIdSchema.nullable().optional(),
+    clientEventId: z.string().min(1).max(64),
+  })
+  .refine((v) => !v.prevId || !v.nextId || v.prevId !== v.nextId, {
+    message: 'prevId and nextId must differ',
+    path: ['prevId'],
+  });
 
 export const copyListSchema = z.object({
   title: z.string().min(1).max(200).trim().optional(),

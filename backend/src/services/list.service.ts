@@ -1,9 +1,15 @@
 import { Types } from 'mongoose';
 import { List } from '../models/list.model.js';
 import { Card } from '../models/card.model.js';
-import { NotFound } from '../utils/errors.js';
-import { computePosition } from '../utils/position.js';
+import { BadRequest, NotFound } from '../utils/errors.js';
+import {
+  computeBetween,
+  needsNormalize,
+  normalizeListsInBoard,
+  STEP,
+} from '../utils/ordering.js';
 import { logActivity } from './activity.service.js';
+import { emitBoard } from '../realtime/bus.js';
 
 export async function listForBoard(boardId: string) {
   return List.find({ boardId, archived: false }).sort({ position: 1 }).lean();
@@ -57,20 +63,54 @@ export async function move(
   id: string,
   prevId: string | null | undefined,
   nextId: string | null | undefined,
+  clientEventId: string,
   actorId: string,
 ) {
   const list = await getById(id);
-  const prevPos = prevId ? (await List.findById(prevId).lean())?.position ?? null : null;
-  const nextPos = nextId ? (await List.findById(nextId).lean())?.position ?? null : null;
-  list.position = computePosition(prevPos, nextPos);
+
+  if (prevId === id || nextId === id) {
+    throw BadRequest('A list cannot be its own neighbor');
+  }
+
+  const readNeighborPos = async (neighborId: string | null | undefined) => {
+    if (!neighborId) return null;
+    const n = await List.findById(neighborId).lean();
+    if (!n) throw BadRequest('Neighbor list not found');
+    if (String(n.boardId) !== String(list.boardId)) {
+      throw BadRequest('Neighbor is not on the same board');
+    }
+    return n.position ?? null;
+  };
+
+  let prevPos = await readNeighborPos(prevId);
+  let nextPos = await readNeighborPos(nextId);
+
+  let normalized = false;
+  if (needsNormalize(prevPos, nextPos)) {
+    await normalizeListsInBoard(String(list.boardId));
+    prevPos = await readNeighborPos(prevId);
+    nextPos = await readNeighborPos(nextId);
+    normalized = true;
+  }
+  list.position = computeBetween(prevPos, nextPos);
   await list.save();
+
   await logActivity({
     boardId: list.boardId,
     listId: list._id,
     actorId,
     type: 'list.moved',
-    payload: { prevId, nextId },
+    payload: { prevId, nextId, position: list.position, clientEventId },
   });
+
+  if (normalized) {
+    emitBoard({
+      boardId: String(list.boardId),
+      type: 'board.normalized',
+      actorId,
+      payload: { boardId: String(list.boardId), clientEventId },
+    });
+  }
   return list;
 }
 
@@ -112,7 +152,7 @@ async function nextPosition(boardId: string): Promise<number> {
     .sort({ position: -1 })
     .select('position')
     .lean();
-  return (last?.position ?? 0) + 65_536;
+  return (last?.position ?? 0) + STEP;
 }
 
 export const _internal = { nextPosition };

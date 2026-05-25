@@ -26,12 +26,17 @@ export const updateCardSchema = z.object({
   archived: z.boolean().optional(),
 });
 
-export const moveCardSchema = z.object({
-  listId: objectIdSchema.optional(),
-  boardId: objectIdSchema.optional(),
-  prevId: objectIdSchema.nullable().optional(),
-  nextId: objectIdSchema.nullable().optional(),
-});
+export const moveCardSchema = z
+  .object({
+    listId: objectIdSchema,
+    prevId: objectIdSchema.nullable().optional(),
+    nextId: objectIdSchema.nullable().optional(),
+    clientEventId: z.string().min(1).max(64),
+  })
+  .refine((v) => !v.prevId || !v.nextId || v.prevId !== v.nextId, {
+    message: 'prevId and nextId must differ',
+    path: ['prevId'],
+  });
 
 export const copyCardSchema = z.object({
   title: z.string().min(1).max(500).trim().optional(),

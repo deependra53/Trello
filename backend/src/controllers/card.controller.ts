@@ -19,10 +19,10 @@ export const remove = asyncHandler<BoardRequest>(async (req, res) => {
 
 export const move = asyncHandler<BoardRequest>(async (req, res) => {
   const body = req.body as {
-    listId?: string;
-    boardId?: string;
+    listId: string;
     prevId?: string | null;
     nextId?: string | null;
+    clientEventId: string;
   };
   const c = await svc.move(req.params.id as string, { ...body, actorId: req.user.sub });
   res.json(c);
