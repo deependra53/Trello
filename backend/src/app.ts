@@ -1,14 +1,18 @@
-import express, { type Express, type Request, type Response, type NextFunction } from 'express';
+import express, { type Express, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
+import { generalLimiter } from './middleware/rateLimit.middleware.js';
+import { notFoundHandler, errorHandler } from './middleware/error.middleware.js';
+import apiRoutes from './routes/index.js';
 
 export function createApp(): Express {
   const app = express();
 
+  app.set('trust proxy', 1);
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN.split(',').map((s) => s.trim()), credentials: true }));
   app.use(compression());
@@ -21,14 +25,10 @@ export function createApp(): Express {
     res.json({ status: 'ok', uptime: process.uptime() });
   });
 
-  app.use((_req: Request, res: Response) => {
-    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
-  });
+  app.use('/api', generalLimiter, apiRoutes);
 
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    logger.error(err);
-    res.status(500).json({ error: { code: 'INTERNAL', message: err.message } });
-  });
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }
