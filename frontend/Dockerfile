@@ -20,5 +20,5 @@ RUN pnpm install --prod
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/next.config.js ./
-EXPOSE 3000
+EXPOSE 3004
 CMD ["pnpm", "start"]
