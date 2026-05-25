@@ -120,15 +120,29 @@
     border-radius: 9999px;
   }
 
-  /* Drag-and-drop cursors + touch handling. */
+  /* Drag-and-drop cursors. */
   .drag-handle {
     cursor: grab;
-    touch-action: none;
   }
   .drag-handle:active,
   [data-rbd-dragging='true'] .drag-handle,
   [data-rbd-dragging='true'] {
     cursor: grabbing;
+  }
+
+  /*
+   * Mobile / touch — applied ONLY to the drag-handle element so that:
+   *   - the browser stops intercepting the long-press as a scroll,
+   *     which lets the library's touch sensor start the lift;
+   *   - the surrounding scroll containers (list rail, list body)
+   *     still pan freely with one-finger swipes when not on a handle.
+   * Selecting text inside a card while dragging would also abort the
+   * drag, so disable user-select on the handle too.
+   */
+  .drag-handle {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 
