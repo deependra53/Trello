@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ vars.DEPLOY_RAILWAY == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Railway CLI
         run: npm i -g @railway/cli
       - run: railway up --service backend
