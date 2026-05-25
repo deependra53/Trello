@@ -36,6 +36,11 @@ export function KanbanView({ board, onOpenCard }: Props) {
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
+    const clientEventId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `evt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     if (type === 'list') {
       const arr = [...sortedLists];
       const [moved] = arr.splice(source.index, 1);
@@ -44,6 +49,7 @@ export function KanbanView({ board, onOpenCard }: Props) {
       const prev = arr[destination.index - 1] ?? null;
       const next = arr[destination.index + 1] ?? null;
       moveList.mutate({
+        clientEventId,
         listId: draggableId,
         prevId: prev?._id ?? null,
         nextId: next?._id ?? null,
@@ -51,16 +57,19 @@ export function KanbanView({ board, onOpenCard }: Props) {
       return;
     }
 
+    // Build the destination-list array AFTER the move so the neighbors we
+    // send to the server match the on-screen layout.
+    const sameList = source.droppableId === destination.droppableId;
     const destCards = [...(cardsByList.get(destination.droppableId) ?? [])];
-    if (source.droppableId === destination.droppableId) {
-      destCards.splice(source.index, 1);
-    }
+    if (sameList) destCards.splice(source.index, 1);
     const moving = board.cards.find((c) => c._id === draggableId);
     if (!moving) return;
     destCards.splice(destination.index, 0, moving);
     const prev = destCards[destination.index - 1] ?? null;
     const next = destCards[destination.index + 1] ?? null;
+
     moveCard.mutate({
+      clientEventId,
       cardId: draggableId,
       listId: destination.droppableId,
       prevId: prev?._id ?? null,

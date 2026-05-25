@@ -2,10 +2,22 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket, joinBoard, leaveBoard } from '@/lib/socket';
+import { isPendingMove } from '@/lib/pending-moves';
+
+interface IncomingBoardEvent {
+  type?: string;
+  payload?: {
+    clientEventId?: string;
+    [k: string]: unknown;
+  };
+}
 
 /**
  * Subscribes to a board's realtime room and invalidates the relevant
- * TanStack Query cache entries whenever the server publishes a change.
+ * TanStack Query cache entries whenever the server publishes a change —
+ * EXCEPT echoes of moves we just initiated locally (deduped by
+ * clientEventId), which are skipped because our optimistic update already
+ * reflects the desired state.
  */
 export function useBoardRealtime(boardId: string | undefined) {
   const qc = useQueryClient();
@@ -14,14 +26,24 @@ export function useBoardRealtime(boardId: string | undefined) {
     const socket = getSocket();
     joinBoard(boardId);
 
-    const invalidate = () => {
+    const onMove = (event: IncomingBoardEvent) => {
+      if (isPendingMove(event.payload?.clientEventId)) return;
       qc.invalidateQueries({ queryKey: ['board', boardId] });
     };
 
-    const events = [
+    const onNormalized = () => {
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
+    };
+
+    const onOther = () => {
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
+    };
+
+    const moveEvents = ['card.moved', 'list.moved'];
+    const normEvents = ['list.normalized', 'board.normalized'];
+    const otherEvents = [
       'card.created',
       'card.updated',
-      'card.moved',
       'card.deleted',
       'card.archived',
       'card.member.added',
@@ -33,16 +55,19 @@ export function useBoardRealtime(boardId: string | undefined) {
       'card.attachment.removed',
       'list.created',
       'list.updated',
-      'list.moved',
       'list.deleted',
       'list.archived',
       'board.updated',
     ];
 
-    events.forEach((e) => socket.on(e, invalidate));
+    moveEvents.forEach((e) => socket.on(e, onMove));
+    normEvents.forEach((e) => socket.on(e, onNormalized));
+    otherEvents.forEach((e) => socket.on(e, onOther));
 
     return () => {
-      events.forEach((e) => socket.off(e, invalidate));
+      moveEvents.forEach((e) => socket.off(e, onMove));
+      normEvents.forEach((e) => socket.off(e, onNormalized));
+      otherEvents.forEach((e) => socket.off(e, onOther));
       leaveBoard(boardId);
     };
   }, [boardId, qc]);

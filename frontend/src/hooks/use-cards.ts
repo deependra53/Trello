@@ -1,7 +1,10 @@
 'use client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import type { BoardFull, Card, Comment, List } from '@/types/api';
+import { applyCardMove, applyListMove } from '@/lib/board-reorder';
+import { trackPendingMove } from '@/lib/pending-moves';
 
 interface BoardKey {
   boardId: string;
@@ -59,19 +62,41 @@ export function useMoveList(boardId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
+      clientEventId,
       listId,
       prevId,
       nextId,
     }: {
+      clientEventId: string;
       listId: string;
       prevId: string | null;
       nextId: string | null;
     }) =>
       api<List>(`/api/lists/${listId}/move`, {
         method: 'POST',
-        body: { prevId, nextId },
+        body: { prevId, nextId, clientEventId },
       }),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+    onMutate: async (vars) => {
+      trackPendingMove(vars.clientEventId);
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      if (prev) {
+        qc.setQueryData<BoardFull>(
+          ['board', boardId],
+          applyListMove(prev, {
+            listId: vars.listId,
+            prevId: vars.prevId,
+            nextId: vars.nextId,
+          }),
+        );
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+      toast.error('Move failed — restored the previous order.');
+    },
+    // No onSettled invalidate — local cache is correct, echo is deduped.
   });
 }
 
@@ -129,11 +154,13 @@ export function useMoveCard({ boardId }: BoardKey) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
+      clientEventId,
       cardId,
       listId,
       prevId,
       nextId,
     }: {
+      clientEventId: string;
       cardId: string;
       listId: string;
       prevId: string | null;
@@ -141,24 +168,30 @@ export function useMoveCard({ boardId }: BoardKey) {
     }) =>
       api<Card>(`/api/cards/${cardId}/move`, {
         method: 'POST',
-        body: { listId, prevId, nextId },
+        body: { listId, prevId, nextId, clientEventId },
       }),
-    onMutate: async ({ cardId, listId }) => {
+    onMutate: async (vars) => {
+      trackPendingMove(vars.clientEventId);
       await qc.cancelQueries({ queryKey: ['board', boardId] });
       const prev = qc.getQueryData<BoardFull>(['board', boardId]);
       if (prev) {
-        const next = {
-          ...prev,
-          cards: prev.cards.map((c) => (c._id === cardId ? { ...c, listId } : c)),
-        };
-        qc.setQueryData(['board', boardId], next);
+        qc.setQueryData<BoardFull>(
+          ['board', boardId],
+          applyCardMove(prev, {
+            cardId: vars.cardId,
+            toListId: vars.listId,
+            prevId: vars.prevId,
+            nextId: vars.nextId,
+          }),
+        );
       }
       return { prev };
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+      toast.error('Move failed — restored the previous order.');
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+    // No onSettled invalidate — cache already correct, echo deduped.
   });
 }
 
