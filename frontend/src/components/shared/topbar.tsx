@@ -25,7 +25,7 @@ export function TopBar() {
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 glass px-4 sm:px-6">
       <Button
         variant="ghost"
         size="icon"
@@ -35,29 +35,36 @@ export function TopBar() {
       >
         <Menu className="h-5 w-5" />
       </Button>
-      <Link href="/boards" className="flex items-center gap-2 font-bold">
-        <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground">
-          T
+      <Link href="/boards" className="flex items-center gap-2.5 font-bold tracking-tight">
+        <div className="grid h-9 w-9 place-items-center rounded-xl brand-gradient text-primary-foreground shadow-glow">
+          <span className="text-base">T</span>
         </div>
-        <span className="hidden sm:inline">TrelloX</span>
+        <span className="hidden text-base sm:inline">TrelloX</span>
       </Link>
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="ml-auto hidden gap-2 md:flex"
+      <button
+        type="button"
         onClick={() => setCommandOpen(true)}
+        className="ml-auto hidden h-9 w-72 items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 text-left text-sm text-muted-foreground transition hover:border-border hover:bg-background md:flex"
       >
         <Search className="h-4 w-4" />
-        <span className="text-muted-foreground">Search…</span>
-        <kbd className="ml-4 text-xs text-muted-foreground">⌘K</kbd>
-      </Button>
+        Search boards, cards, members…
+        <kbd className="ml-auto rounded border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium">
+          ⌘K
+        </kbd>
+      </button>
 
-      <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setCommandOpen(true)} aria-label="Search">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="ml-auto md:hidden"
+        onClick={() => setCommandOpen(true)}
+        aria-label="Search"
+      >
         <Search className="h-5 w-5" />
       </Button>
 
-      <Button variant="ghost" size="icon" aria-label="Notifications">
+      <Button variant="ghost" size="icon" aria-label="Notifications" className="relative md:ml-2">
         <Bell className="h-5 w-5" />
       </Button>
 
@@ -66,15 +73,17 @@ export function TopBar() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label="Profile">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>{getInitials(user?.fullName)}</AvatarFallback>
+            <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+              <AvatarFallback className="bg-primary/10 text-primary">
+                {getInitials(user?.fullName)}
+              </AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-60">
           <DropdownMenuLabel>
             <div className="flex flex-col">
-              <span>{user?.fullName ?? 'Guest'}</span>
+              <span className="font-semibold">{user?.fullName ?? 'Guest'}</span>
               <span className="text-xs font-normal text-muted-foreground">{user?.email}</span>
             </div>
           </DropdownMenuLabel>

@@ -4,10 +4,12 @@ import { useRouter } from 'next/navigation';
 import { TopBar } from '@/components/shared/topbar';
 import { Sidebar } from '@/components/shared/sidebar';
 import { useAuthStore } from '@/stores/auth';
+import { useNotificationRealtime } from '@/hooks/use-realtime';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, initialized, loading } = useAuthStore();
+  useNotificationRealtime();
 
   useEffect(() => {
     if (initialized && !loading && !user) router.replace('/login');

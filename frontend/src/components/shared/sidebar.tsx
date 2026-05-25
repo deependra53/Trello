@@ -4,6 +4,9 @@ import { usePathname } from 'next/navigation';
 import { Calendar, Inbox, LayoutGrid, Layers, Settings, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { Workspace } from '@/types/api';
 
 const items = [
   { href: '/boards', label: 'Boards', icon: LayoutGrid },
@@ -18,50 +21,80 @@ export function Sidebar() {
   const open = useUIStore((s) => s.sidebarOpen);
   const setOpen = useUIStore((s) => s.setSidebarOpen);
 
+  const { data: workspaces } = useQuery({
+    queryKey: ['workspaces'],
+    queryFn: () => api<{ items: Workspace[] }>('/api/workspaces').then((r) => r.items),
+  });
+
   return (
     <>
-      {/* mobile overlay */}
       {open && (
         <button
           aria-label="Close sidebar"
-          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          className="fixed inset-0 z-20 bg-black/50 md:hidden"
           onClick={() => setOpen(false)}
         />
       )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 top-14 z-30 w-64 transform border-r bg-background transition-transform md:sticky md:top-14 md:h-[calc(100vh-3.5rem)] md:translate-x-0',
+          'fixed inset-y-0 left-0 top-16 z-30 w-64 transform border-r border-border/60 bg-background transition-transform md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
       >
-        <nav className="flex h-full flex-col p-4">
-          <div className="mb-2 px-2 text-xs font-semibold uppercase text-muted-foreground">
-            Workspace
-          </div>
+        <nav className="flex h-full flex-col gap-1 p-3">
           {items.map(({ href, label, icon: Icon }) => {
-            const active = pathname?.startsWith(href);
+            const active = pathname === href || pathname?.startsWith(href + '/');
             return (
               <Link
                 key={href}
                 href={href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
                   active
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
-                <Icon className="h-4 w-4" /> {label}
+                <Icon
+                  className={cn(
+                    'h-4 w-4 transition-transform group-hover:scale-110',
+                    active && 'text-primary',
+                  )}
+                />
+                {label}
               </Link>
             );
           })}
 
-          <div className="mt-6 mb-2 px-2 text-xs font-semibold uppercase text-muted-foreground">
+          <div className="mt-6 mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Workspaces
+          </div>
+          {!workspaces ? (
+            <div className="px-3 text-xs text-muted-foreground">Loading…</div>
+          ) : workspaces.length === 0 ? (
+            <div className="px-3 text-xs text-muted-foreground">No workspaces yet</div>
+          ) : (
+            workspaces.map((ws) => (
+              <Link
+                key={ws._id}
+                href={`/boards?workspace=${ws._id}`}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <div className="grid h-6 w-6 place-items-center rounded-md brand-gradient text-[10px] font-bold text-primary-foreground">
+                  {ws.name[0]?.toUpperCase()}
+                </div>
+                <span className="truncate">{ws.name}</span>
+              </Link>
+            ))
+          )}
+
+          <div className="mt-6 mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Starred
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-            <Star className="h-4 w-4" /> No starred boards yet
+          <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+            <Star className="h-3.5 w-3.5" /> No starred boards yet
           </div>
         </nav>
       </aside>
