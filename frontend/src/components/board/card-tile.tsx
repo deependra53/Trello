@@ -39,9 +39,18 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
       : undefined;
 
   return (
-    <button
-      type="button"
+    // role=button (not a real <button>) — a <button> inside a Draggable wrapper
+    // swallows the mousedown the DnD sensor needs to detect drag-vs-click.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen?.();
+        }
+      }}
       className={cn(
         'w-full overflow-hidden rounded-lg bg-card text-left shadow-soft transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary',
         isDragging && 'rotate-2 ring-2 ring-primary/60 shadow-glow',
@@ -106,6 +115,6 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
           </div>
         )}
       </div>
-    </button>
+    </div>
   );
 }
