@@ -1,0 +1,32 @@
+name: backend-ci
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'shared/**', '.github/workflows/backend-ci.yml']
+  pull_request:
+    paths: ['backend/**', 'shared/**', '.github/workflows/backend-ci.yml']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports: ['27017:27017']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter backend lint
+      - run: pnpm --filter backend typecheck
+      - run: pnpm --filter backend test
+        env:
+          MONGODB_URI: mongodb://localhost:27017/trellox_test
+          JWT_ACCESS_SECRET: test-secret-test-secret
+          JWT_REFRESH_SECRET: test-secret-test-secret-2
+      - run: pnpm --filter backend build

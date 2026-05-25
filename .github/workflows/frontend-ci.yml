@@ -1,0 +1,25 @@
+name: frontend-ci
+on:
+  push:
+    branches: [main]
+    paths: ['frontend/**', 'shared/**', '.github/workflows/frontend-ci.yml']
+  pull_request:
+    paths: ['frontend/**', 'shared/**', '.github/workflows/frontend-ci.yml']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter frontend lint
+      - run: pnpm --filter frontend typecheck
+      - run: pnpm --filter frontend build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
