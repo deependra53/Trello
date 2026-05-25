@@ -70,29 +70,33 @@ export function KanbanView({ board, onOpenCard }: Props) {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <Droppable droppableId="board" type="list" direction="horizontal">
-        {(provided) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className="flex flex-1 items-start gap-3 overflow-x-auto p-4 pb-8 scrollbar-thin"
-          >
-            {sortedLists.map((list, idx) => (
-              <ListColumn
-                key={list._id}
-                list={list}
-                cards={cardsByList.get(list._id) ?? []}
-                labels={board.labels}
-                index={idx}
-                boardId={board._id}
-                onOpenCard={onOpenCard}
-              />
-            ))}
-            {provided.placeholder}
-            <AddListForm boardId={board._id} />
-          </div>
-        )}
-      </Droppable>
+      {/* Outer flex container — AddListForm sits outside the Droppable so the
+          library's placeholder is always the last child of the droppable. */}
+      <div className="flex flex-1 items-start gap-3 overflow-x-auto p-4 pb-8 scrollbar-thin">
+        <Droppable droppableId="board" type="list" direction="horizontal">
+          {(provided) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className="flex items-start gap-3"
+            >
+              {sortedLists.map((list, idx) => (
+                <ListColumn
+                  key={list._id}
+                  list={list}
+                  cards={cardsByList.get(list._id) ?? []}
+                  labels={board.labels}
+                  index={idx}
+                  boardId={board._id}
+                  onOpenCard={onOpenCard}
+                />
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+        <AddListForm boardId={board._id} />
+      </div>
     </DragDropContext>
   );
 }
