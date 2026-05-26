@@ -1,4 +1,5 @@
 'use client';
+import { createPortal } from 'react-dom';
 import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -24,7 +25,12 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
           ref={provided.innerRef}
           {...provided.draggableProps}
           className={cn(
-            'flex max-h-[calc(100vh-9.5rem)] w-72 shrink-0 flex-col rounded-xl bg-muted/90 p-2 shadow-soft backdrop-blur-sm',
+            // bg-muted (solid) + no backdrop-filter — both `backdrop-filter`
+            // and `overflow` create new containing blocks that throw off the
+            // drag preview's coordinate math. The portaled clone (below) is
+            // what fixes the visible-position issue, but keeping the column
+            // free of filter ancestors is the defensive belt-and-braces.
+            'flex max-h-[calc(100vh-9.5rem)] w-72 shrink-0 flex-col rounded-xl bg-muted p-2 shadow-soft',
             snapshot.isDragging && 'rotate-1 ring-2 ring-primary',
           )}
         >
@@ -43,7 +49,30 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
             </div>
           </div>
 
-          <Droppable droppableId={list._id} type="card">
+          <Droppable
+            droppableId={list._id}
+            type="card"
+            renderClone={(dragProvided, _dragSnapshot, rubric) => {
+              const dragged = cards.find((c) => c._id === rubric.draggableId);
+              if (!dragged) return <div />;
+              // Portal the dragged card to document.body so its `transform:
+              // translate()` is calculated against the viewport instead of
+              // any clipping/transforming ancestor (overflow-y-auto on the
+              // droppable body, etc.). This fixes both the visual offset
+              // and the "card disappears when dragged out of its list".
+              return createPortal(
+                <div
+                  ref={dragProvided.innerRef}
+                  {...dragProvided.draggableProps}
+                  {...dragProvided.dragHandleProps}
+                  className="drag-handle w-72"
+                >
+                  <CardTile card={dragged} labels={labels} isDragging />
+                </div>,
+                document.body,
+              );
+            }}
+          >
             {(dropProvided, dropSnapshot) => (
               <div
                 ref={dropProvided.innerRef}
@@ -55,7 +84,7 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
               >
                 {cards.map((card, i) => (
                   <Draggable key={card._id} draggableId={card._id} index={i}>
-                    {(cardProvided, cardSnapshot) => (
+                    {(cardProvided) => (
                       <div
                         ref={cardProvided.innerRef}
                         {...cardProvided.draggableProps}
@@ -66,7 +95,7 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
                           card={card}
                           labels={labels}
                           onOpen={() => onOpenCard(card._id)}
-                          isDragging={cardSnapshot.isDragging}
+                          isDragging={false}
                         />
                       </div>
                     )}
