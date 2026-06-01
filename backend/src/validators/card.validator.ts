@@ -15,7 +15,7 @@ export const updateCardSchema = z.object({
   dueComplete: z.boolean().optional(),
   cover: z
     .object({
-      type: z.enum(['color', 'image', 'attachment']),
+      type: z.enum(['color', 'gradient', 'image', 'attachment']),
       value: z.string(),
       size: z.enum(['normal', 'full']).optional(),
       brightness: z.enum(['light', 'dark']).optional(),

@@ -49,3 +49,31 @@ export const sign = asyncHandler(async (_req: Request, res) => {
     note: 'POST multipart to /api/cards/:id/attachments with field "file".',
   });
 });
+
+export const presignCardAttachment = asyncHandler<BoardRequest>(async (req, res) => {
+  const { name, mimeType } = req.body as { name?: string; mimeType?: string };
+  if (!name || !mimeType) throw BadRequest('name and mimeType are required');
+  const presigned = await svc.presignAttachment(req.params.id as string, { name, mimeType });
+  if (!presigned) {
+    res.json({ provider: 'local', method: 'POST' });
+    return;
+  }
+  res.json(presigned);
+});
+
+export const registerCardAttachment = asyncHandler<BoardRequest>(async (req, res) => {
+  const { name, url, key, mimeType, size } = req.body as {
+    name?: string;
+    url?: string;
+    key?: string;
+    mimeType?: string;
+    size?: number;
+  };
+  if (!name || !url) throw BadRequest('name and url are required');
+  const att = await svc.registerAttachment(
+    req.params.id as string,
+    { name, url, key, mimeType, size },
+    req.user.sub,
+  );
+  res.status(201).json(att);
+});

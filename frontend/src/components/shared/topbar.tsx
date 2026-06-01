@@ -48,9 +48,9 @@ export function TopBar() {
         onClick={() => setCommandOpen(true)}
         className="ml-auto hidden h-9 w-72 items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 text-left text-sm text-muted-foreground transition hover:border-border hover:bg-background md:flex"
       >
-        <Search className="h-4 w-4" />
-        Search boards, cards, members…
-        <kbd className="ml-auto rounded border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium">
+        <Search className="h-4 w-4 shrink-0" />
+        <span className="flex-1 truncate whitespace-nowrap">Search boards, cards, members…</span>
+        <kbd className="shrink-0 rounded border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium">
           ⌘K
         </kbd>
       </button>

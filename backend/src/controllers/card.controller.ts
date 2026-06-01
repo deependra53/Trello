@@ -1,6 +1,7 @@
 import * as svc from '../services/card.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import type { BoardRequest } from '../middleware/authorize.middleware.js';
+import { Activity as ActivityModel } from '../models/activity.model.js';
 
 export const get = asyncHandler<BoardRequest>(async (req, res) => {
   const card = await svc.getById(req.params.id as string);
@@ -99,6 +100,7 @@ export const addChecklistItem = asyncHandler<BoardRequest>(async (req, res) => {
     req.params.cardId as string,
     req.params.checklistId as string,
     req.body,
+    req.user.sub,
   );
   res.status(201).json(item);
 });
@@ -108,13 +110,45 @@ export const updateChecklistItem = asyncHandler<BoardRequest>(async (req, res) =
     req.params.cardId as string,
     req.params.itemId as string,
     req.body,
+    req.user.sub,
   );
   res.json(r);
 });
 
 export const deleteChecklistItem = asyncHandler<BoardRequest>(async (req, res) => {
-  await svc.deleteChecklistItem(req.params.cardId as string, req.params.itemId as string);
+  await svc.deleteChecklistItem(
+    req.params.cardId as string,
+    req.params.itemId as string,
+    req.user.sub,
+  );
   res.status(204).end();
+});
+
+export const convertChecklistItem = asyncHandler<BoardRequest>(async (req, res) => {
+  const card = await svc.convertChecklistItemToCard(
+    req.params.cardId as string,
+    req.params.itemId as string,
+    req.user.sub,
+  );
+  res.status(201).json(card);
+});
+
+export const cardActivity = asyncHandler<BoardRequest>(async (req, res) => {
+  const cursor = req.query.cursor as string | undefined;
+  const limit = Math.min(Number(req.query.limit) || 50, 100);
+  const q: Record<string, unknown> = { cardId: req.params.id as string };
+  if (cursor) q.createdAt = { $lt: new Date(cursor) };
+  const items = await ActivityModel.find(q)
+    .sort({ createdAt: -1 })
+    .limit(limit + 1)
+    .lean();
+  const hasMore = items.length > limit;
+  if (hasMore) items.pop();
+  const last = items[items.length - 1];
+  res.json({
+    items,
+    nextCursor: hasMore && last ? (last.createdAt as Date).toISOString() : undefined,
+  });
 });
 
 // Comments

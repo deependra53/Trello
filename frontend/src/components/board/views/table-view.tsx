@@ -72,7 +72,7 @@ export function TableView({ board, onOpenCard }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-center gap-2 rounded-xl bg-white/95 p-3 shadow-soft">
+      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-3 shadow-soft">
         <Search className="h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Filter cards by title or description…"
@@ -85,10 +85,10 @@ export function TableView({ board, onOpenCard }: Props) {
         </span>
       </div>
 
-      <div className="flex-1 overflow-auto rounded-xl bg-white/95 shadow-soft scrollbar-thin">
+      <div className="flex-1 overflow-auto rounded-xl border border-border/60 bg-card shadow-soft scrollbar-thin">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur">
-            <tr className="border-b text-left text-xs text-muted-foreground">
+          <thead className="sticky top-0 z-10 bg-card">
+            <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
               <Th onClick={() => toggleSort('title')} active={sort.field === 'title'}>
                 Title
               </Th>
@@ -164,7 +164,7 @@ function Row({
     card.dueDate && !card.dueComplete && new Date(card.dueDate) < new Date();
   return (
     <tr
-      className="cursor-pointer border-b transition hover:bg-muted/40"
+      className="cursor-pointer border-b border-border/60 transition hover:bg-muted/40"
       onClick={() => onOpen(card._id)}
     >
       <td className="px-3 py-2.5 font-medium">{card.title}</td>

@@ -129,9 +129,19 @@ export function DashboardView({ board }: Props) {
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={cardsPerList}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip cursor={{ fill: 'hsl(var(--accent) / 0.4)' }} />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+              <Tooltip
+                cursor={{ fill: 'hsl(var(--accent) / 0.4)' }}
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--popover))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 8,
+                  color: 'hsl(var(--popover-foreground))',
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))' }}
+              />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {cardsPerList.map((_, i) => (
                   <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
@@ -145,9 +155,19 @@ export function DashboardView({ board }: Props) {
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={cardsPerMember} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
-              <Tooltip cursor={{ fill: 'hsl(var(--accent) / 0.4)' }} />
+              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+              <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+              <Tooltip
+                cursor={{ fill: 'hsl(var(--accent) / 0.4)' }}
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--popover))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 8,
+                  color: 'hsl(var(--popover-foreground))',
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))' }}
+              />
               <Bar dataKey="count" radius={[0, 6, 6, 0]} fill="#795DFF" />
             </BarChart>
           </ResponsiveContainer>
@@ -164,8 +184,17 @@ export function DashboardView({ board }: Props) {
                     <Cell key={i} fill={d.color || PALETTE[i % PALETTE.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--popover))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 8,
+                    color: 'hsl(var(--popover-foreground))',
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -182,8 +211,17 @@ export function DashboardView({ board }: Props) {
                     <Cell key={i} fill={d.color} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--popover))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 8,
+                    color: 'hsl(var(--popover-foreground))',
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -193,10 +231,19 @@ export function DashboardView({ board }: Props) {
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={completion}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--popover))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 8,
+                  color: 'hsl(var(--popover-foreground))',
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))' }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
               <Line
                 type="monotone"
                 dataKey="created"
@@ -221,7 +268,7 @@ export function DashboardView({ board }: Props) {
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl bg-white/95 p-4 shadow-soft">
+    <div className="rounded-xl border border-border/60 bg-card p-4 shadow-soft">
       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
@@ -240,7 +287,11 @@ function Panel({
   className?: string;
 }) {
   return (
-    <div className={'rounded-xl bg-white/95 p-4 shadow-soft ' + (className ?? '')}>
+    <div
+      className={
+        'rounded-xl border border-border/60 bg-card p-4 shadow-soft ' + (className ?? '')
+      }
+    >
       <h3 className="mb-3 text-sm font-semibold">{title}</h3>
       {children}
     </div>

@@ -3,6 +3,7 @@ import { Board } from '../models/board.model.js';
 import { List } from '../models/list.model.js';
 import { Card } from '../models/card.model.js';
 import { Label } from '../models/label.model.js';
+import { User } from '../models/user.model.js';
 import { NotFound } from '../utils/errors.js';
 import { logActivity } from './activity.service.js';
 
@@ -51,12 +52,24 @@ export async function getById(id: string) {
 export async function getFull(id: string) {
   const board = await Board.findById(id).lean();
   if (!board) throw NotFound('Board not found');
-  const [lists, cards, labels] = await Promise.all([
+  const memberIds = (board.members ?? []).map((m) => m.userId);
+  const [lists, cards, labels, memberDocs] = await Promise.all([
     List.find({ boardId: id, archived: false }).sort({ position: 1 }).lean(),
     Card.find({ boardId: id, archived: false }).sort({ position: 1 }).lean(),
     Label.find({ boardId: id }).lean(),
+    memberIds.length
+      ? User.find({ _id: { $in: memberIds } })
+          .select('fullName email avatarUrl')
+          .lean()
+      : Promise.resolve([] as Array<{ _id: unknown; fullName: string; email: string; avatarUrl?: string }>),
   ]);
-  return { ...board, lists, cards, labels };
+  const memberProfiles = memberDocs.map((u) => ({
+    _id: String(u._id),
+    fullName: u.fullName,
+    email: u.email,
+    avatarUrl: u.avatarUrl,
+  }));
+  return { ...board, lists, cards, labels, memberProfiles };
 }
 
 export async function update(id: string, patch: Record<string, unknown>, actorId: string) {

@@ -43,6 +43,51 @@ export async function addAttachment(
   return attachment;
 }
 
+export async function presignAttachment(
+  cardId: string,
+  input: { name: string; mimeType: string },
+) {
+  const card = await Card.findById(cardId);
+  if (!card) throw NotFound('Card not found');
+  const provider = getUploadProvider();
+  const presigned = await provider.presignPut({
+    originalName: input.name,
+    mimeType: input.mimeType,
+    folder: String(card.boardId),
+  });
+  return presigned;
+}
+
+export async function registerAttachment(
+  cardId: string,
+  input: { name: string; url: string; key?: string; mimeType?: string; size?: number },
+  actorId: string,
+) {
+  const card = await Card.findById(cardId);
+  if (!card) throw NotFound('Card not found');
+
+  const attachment = {
+    id: crypto.randomUUID(),
+    name: input.name,
+    url: input.url,
+    mimeType: input.mimeType,
+    size: input.size,
+    uploadedBy: new Types.ObjectId(actorId),
+    uploadedAt: new Date(),
+    isCover: false,
+  };
+
+  await Card.updateOne({ _id: cardId }, { $push: { attachments: attachment } });
+  await logActivity({
+    boardId: card.boardId,
+    cardId: card._id,
+    actorId,
+    type: 'card.attachment.added',
+    payload: { name: input.name, url: input.url },
+  });
+  return attachment;
+}
+
 export async function removeAttachment(cardId: string, attachmentId: string, actorId: string) {
   const card = await Card.findById(cardId);
   if (!card) throw NotFound('Card not found');

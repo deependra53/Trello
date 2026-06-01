@@ -61,6 +61,17 @@ const config: Config = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      keyframes: {
+        'check-pop': {
+          '0%': { transform: 'scale(1)' },
+          '40%': { transform: 'scale(1.3)' },
+          '70%': { transform: 'scale(0.92)' },
+          '100%': { transform: 'scale(1)' },
+        },
+      },
+      animation: {
+        'check-pop': 'check-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+      },
     },
   },
   plugins: [require('tailwindcss-animate')],

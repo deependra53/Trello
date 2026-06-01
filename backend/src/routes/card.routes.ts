@@ -101,6 +101,14 @@ router.delete(
   requireCardAccess('admin', 'member'),
   ctrl.deleteChecklistItem,
 );
+router.post(
+  '/:cardId/checklist-items/:itemId/convert',
+  requireCardAccess('admin', 'member'),
+  ctrl.convertChecklistItem,
+);
+
+// Card activity
+router.get('/:id/activity', requireCardAccess('admin', 'member', 'observer'), ctrl.cardActivity);
 
 // Comments
 router.get('/:id/comments', requireCardAccess('admin', 'member', 'observer'), ctrl.listComments);
@@ -129,6 +137,16 @@ router.post(
 );
 
 // Attachments
+router.post(
+  '/:id/attachments/sign',
+  requireCardAccess('admin', 'member'),
+  uploadCtrl.presignCardAttachment,
+);
+router.post(
+  '/:id/attachments/register',
+  requireCardAccess('admin', 'member'),
+  uploadCtrl.registerCardAttachment,
+);
 router.post(
   '/:id/attachments',
   requireCardAccess('admin', 'member'),

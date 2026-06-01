@@ -324,6 +324,7 @@ export async function addChecklistItem(
   cardId: string,
   checklistId: string,
   input: { text: string; memberId?: string; dueDate?: string },
+  actorId: string,
 ) {
   const card = await getById(cardId);
   const cl = card.checklists?.find((c) => c.id === checklistId);
@@ -338,6 +339,13 @@ export async function addChecklistItem(
   };
   cl.items?.push(item);
   await card.save();
+  await logActivity({
+    boardId: card.boardId,
+    cardId: card._id,
+    actorId,
+    type: 'card.checklist.item.added',
+    payload: { checklistId, itemId: item.id, text: input.text },
+  });
   return item;
 }
 
@@ -351,12 +359,20 @@ export async function updateChecklistItem(
     dueDate?: string | null;
     position?: number;
   },
+  actorId: string,
 ) {
   const card = await getById(cardId);
   let found = false;
+  let activityType: string | undefined;
+  let activityPayload: Record<string, unknown> = {};
   for (const cl of card.checklists ?? []) {
     const item = (cl.items ?? []).find((i) => i.id === itemId);
     if (!item) continue;
+    const before = {
+      completed: item.completed,
+      memberId: item.memberId ? String(item.memberId) : null,
+      dueDate: item.dueDate ? new Date(item.dueDate).toISOString() : null,
+    };
     if (patch.text !== undefined) item.text = patch.text;
     if (patch.completed !== undefined) item.completed = patch.completed;
     if (patch.memberId !== undefined)
@@ -365,18 +381,137 @@ export async function updateChecklistItem(
       item.dueDate = patch.dueDate ? new Date(patch.dueDate) : null;
     if (patch.position !== undefined) item.position = patch.position;
     found = true;
+
+    if (patch.completed !== undefined && patch.completed !== before.completed) {
+      activityType = patch.completed
+        ? 'card.checklist.item.completed'
+        : 'card.checklist.item.uncompleted';
+      activityPayload = { checklistId: cl.id, itemId, text: item.text };
+    } else if (patch.memberId !== undefined) {
+      const next = patch.memberId ?? null;
+      if (next !== before.memberId) {
+        activityType = next
+          ? 'card.checklist.item.assigned'
+          : 'card.checklist.item.unassigned';
+        activityPayload = {
+          checklistId: cl.id,
+          itemId,
+          text: item.text,
+          memberId: next,
+          previousMemberId: before.memberId,
+        };
+      }
+    } else if (patch.dueDate !== undefined) {
+      const next = patch.dueDate ?? null;
+      if (next !== before.dueDate) {
+        activityType = next
+          ? 'card.checklist.item.due-set'
+          : 'card.checklist.item.due-cleared';
+        activityPayload = {
+          checklistId: cl.id,
+          itemId,
+          text: item.text,
+          dueDate: next,
+        };
+      }
+    }
     break;
   }
   if (!found) throw NotFound('Checklist item not found');
   await card.save();
+  if (activityType) {
+    await logActivity({
+      boardId: card.boardId,
+      cardId: card._id,
+      actorId,
+      type: activityType,
+      payload: activityPayload,
+    });
+  }
   return getById(cardId);
 }
 
-export async function deleteChecklistItem(cardId: string, itemId: string) {
+export async function deleteChecklistItem(cardId: string, itemId: string, actorId: string) {
+  const card = await getById(cardId);
+  let removedText = '';
+  let parentChecklistId = '';
+  for (const cl of card.checklists ?? []) {
+    const item = (cl.items ?? []).find((i) => i.id === itemId);
+    if (item) {
+      removedText = item.text;
+      parentChecklistId = cl.id;
+      break;
+    }
+  }
   await Card.updateOne(
     { _id: cardId },
     { $pull: { 'checklists.$[].items': { id: itemId } } },
   );
+  if (removedText) {
+    await logActivity({
+      boardId: card.boardId,
+      cardId: card._id,
+      actorId,
+      type: 'card.checklist.item.deleted',
+      payload: { checklistId: parentChecklistId, itemId, text: removedText },
+    });
+  }
+}
+
+export async function convertChecklistItemToCard(
+  sourceCardId: string,
+  itemId: string,
+  actorId: string,
+) {
+  const source = await getById(sourceCardId);
+  let foundText = '';
+  let parentChecklistId = '';
+  for (const cl of source.checklists ?? []) {
+    const item = (cl.items ?? []).find((i) => i.id === itemId);
+    if (item) {
+      foundText = item.text;
+      parentChecklistId = cl.id;
+      break;
+    }
+  }
+  if (!foundText) throw NotFound('Checklist item not found');
+
+  const newCard = await Card.create({
+    listId: source.listId,
+    boardId: source.boardId,
+    title: foundText,
+    description: '',
+    position: source.position + 1,
+    watchers: [actorId],
+  });
+
+  await Card.updateOne(
+    { _id: sourceCardId },
+    { $pull: { 'checklists.$[].items': { id: itemId } } },
+  );
+
+  await logActivity({
+    boardId: source.boardId,
+    listId: source.listId,
+    cardId: newCard._id,
+    actorId,
+    type: 'card.created',
+    payload: { title: foundText, convertedFromCardId: String(source._id) },
+  });
+  await logActivity({
+    boardId: source.boardId,
+    cardId: source._id,
+    actorId,
+    type: 'card.checklist.item.converted',
+    payload: {
+      checklistId: parentChecklistId,
+      itemId,
+      text: foundText,
+      newCardId: String(newCard._id),
+    },
+  });
+
+  return newCard;
 }
 
 // ---- Comments ----------------------------------------------------------------

@@ -82,7 +82,7 @@ export function TimelineView({ board, onOpenCard }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-center gap-2 rounded-xl bg-white/95 p-3 shadow-soft">
+      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-3 shadow-soft">
         <h3 className="text-base font-semibold">{format(cursor, 'MMMM yyyy')}</h3>
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => setCursor(subMonths(cursor, 1))} aria-label="Previous month">
@@ -97,14 +97,14 @@ export function TimelineView({ board, onOpenCard }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-xl bg-white/95 shadow-soft">
+      <div className="flex-1 overflow-hidden rounded-xl border border-border/60 bg-card shadow-soft">
         <div className="flex h-full">
-          <div className="w-48 shrink-0 overflow-y-auto border-r bg-muted/30 scrollbar-thin">
-            <div className="sticky top-0 z-10 h-9 border-b bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground">
+          <div className="w-48 shrink-0 overflow-y-auto border-r border-border/60 bg-muted/30 scrollbar-thin">
+            <div className="sticky top-0 z-10 h-9 border-b border-border/60 bg-muted/60 px-3 py-2 text-xs font-semibold text-muted-foreground">
               List
             </div>
             {grouped.map(([listId, cards]) => (
-              <div key={listId} className="border-b">
+              <div key={listId} className="border-b border-border/60">
                 <div className="px-3 py-2 text-xs font-semibold">
                   {listMap.get(listId)?.title ?? 'Unknown'}
                 </div>
@@ -128,13 +128,13 @@ export function TimelineView({ board, onOpenCard }: Props) {
 
           <div className="flex-1 overflow-auto scrollbar-thin">
             <div style={{ width: totalDays * DAY_WIDTH }} className="relative">
-              <div className="sticky top-0 z-10 flex h-9 border-b bg-muted/40">
+              <div className="sticky top-0 z-10 flex h-9 border-b border-border/60 bg-muted/60">
                 {days.map((d) => (
                   <div
                     key={d.toISOString()}
                     className={cn(
-                      'flex shrink-0 flex-col items-center justify-center border-r text-[10px]',
-                      isWeekend(d) && 'bg-muted/60',
+                      'flex shrink-0 flex-col items-center justify-center border-r border-border/60 text-[10px]',
+                      isWeekend(d) && 'bg-muted/80',
                       isToday(d) && 'bg-primary/10 font-bold text-primary',
                     )}
                     style={{ width: DAY_WIDTH }}
@@ -146,14 +146,14 @@ export function TimelineView({ board, onOpenCard }: Props) {
               </div>
 
               {grouped.map(([listId, cards]) => (
-                <div key={listId} className="border-b">
-                  <div className="relative h-[33px] border-b" />
+                <div key={listId} className="border-b border-border/60">
+                  <div className="relative h-[33px] border-b border-border/60" />
                   {cards.map((c) => {
                     const { left, width } = barFor(c);
                     const lbl = (c.labels ?? [])[0];
                     const color = lbl ? labelMap.get(lbl)?.color : '#795DFF';
                     return (
-                      <div key={c._id} className="relative h-[29px] border-b">
+                      <div key={c._id} className="relative h-[29px] border-b border-border/60">
                         <button
                           onClick={() => onOpenCard(c._id)}
                           className="absolute top-1.5 grid h-5 place-items-center rounded-md px-2 text-[10px] font-medium text-white shadow-soft transition hover:scale-[1.02]"

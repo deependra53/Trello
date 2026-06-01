@@ -1,12 +1,21 @@
 'use client';
+import { useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Filter, Star, Users } from 'lucide-react';
+import { ArrowLeft, Star, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CardModal } from '@/components/card/card-modal';
 import { ViewSwitcher, type BoardViewKind } from '@/components/board/view-switcher';
+import { BoardBottomNav } from '@/components/board/board-bottom-nav';
+import { BoardSwitcherDialog } from '@/components/board/board-switcher-dialog';
+import {
+  BoardFilterPopover,
+  applyBoardFilter,
+  emptyFilter,
+  type BoardFilter,
+} from '@/components/board/board-filter-popover';
 import { KanbanView } from '@/components/board/views/kanban-view';
 import { CalendarView } from '@/components/board/views/calendar-view';
 import { TimelineView } from '@/components/board/views/timeline-view';
@@ -31,6 +40,8 @@ export default function BoardPage() {
   useBoardRealtime(boardId);
   const { data: board, isLoading } = useBoard(boardId);
   const star = useStarBoard(boardId);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [filter, setFilter] = useState<BoardFilter>(emptyFilter);
 
   function setView(v: BoardViewKind) {
     const params = new URLSearchParams(sp.toString());
@@ -56,7 +67,7 @@ export default function BoardPage() {
   if (isLoading) return <BoardSkeleton />;
   if (!board) {
     return (
-      <div className="grid h-[80vh] place-items-center text-sm text-muted-foreground">
+      <div className="grid h-full place-items-center text-sm text-muted-foreground">
         Board not found
       </div>
     );
@@ -69,11 +80,12 @@ export default function BoardPage() {
 
   const isStarred = (board.starredBy ?? []).length > 0;
   const openCard_ = openCardId ? board.cards.find((c) => c._id === openCardId) : undefined;
+  const filteredBoard = { ...board, cards: applyBoardFilter(board.cards, filter) };
 
   return (
-    <div className="relative flex min-h-[calc(100vh-4rem)] flex-col" style={bgStyle}>
+    <div className="relative flex h-full flex-col" style={bgStyle}>
       <div className="pointer-events-none absolute inset-0 bg-black/15" />
-      <div className="relative z-10 flex h-[calc(100vh-4rem)] flex-col">
+      <div className="relative z-10 flex h-full flex-col">
         <div className="flex flex-wrap items-center gap-3 bg-black/25 px-4 py-3 backdrop-blur-md">
           <Button
             asChild
@@ -105,13 +117,7 @@ export default function BoardPage() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-white hover:bg-white/15 hover:text-white"
-            >
-              <Filter className="h-4 w-4" /> Filter
-            </Button>
+            <BoardFilterPopover board={board} filter={filter} onChange={setFilter} />
             <div className="hidden items-center -space-x-1 sm:flex">
               {Array.from({ length: Math.min(board.members?.length ?? 0, 4) }).map((_, i) => (
                 <Avatar key={i} className="h-7 w-7 border-2 border-white/40">
@@ -132,15 +138,21 @@ export default function BoardPage() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-hidden">
-          {view === 'board' && <KanbanView board={board} onOpenCard={openCard} />}
-          {view === 'calendar' && <CalendarView board={board} onOpenCard={openCard} />}
-          {view === 'timeline' && <TimelineView board={board} onOpenCard={openCard} />}
-          {view === 'table' && <TableView board={board} onOpenCard={openCard} />}
-          {view === 'dashboard' && <DashboardView board={board} />}
-          {view === 'map' && <MapView board={board} onOpenCard={openCard} />}
+          {view === 'board' && <KanbanView board={filteredBoard} onOpenCard={openCard} />}
+          {view === 'calendar' && <CalendarView board={filteredBoard} onOpenCard={openCard} />}
+          {view === 'timeline' && <TimelineView board={filteredBoard} onOpenCard={openCard} />}
+          {view === 'table' && <TableView board={filteredBoard} onOpenCard={openCard} />}
+          {view === 'dashboard' && <DashboardView board={filteredBoard} />}
+          {view === 'map' && <MapView board={filteredBoard} onOpenCard={openCard} />}
         </div>
       </div>
       {openCard_ && <CardModal card={openCard_} board={board} open onClose={closeCard} />}
+      <BoardBottomNav onSwitchBoards={() => setSwitcherOpen(true)} />
+      <BoardSwitcherDialog
+        open={switcherOpen}
+        onOpenChange={setSwitcherOpen}
+        currentBoardId={boardId}
+      />
     </div>
   );
 }
@@ -148,7 +160,7 @@ export default function BoardPage() {
 function BoardSkeleton() {
   return (
     <div
-      className="grid min-h-[calc(100vh-4rem)] place-items-center"
+      className="grid h-full place-items-center"
       style={{ backgroundColor: '#795DFF' }}
     >
       <div className="text-sm text-white/80">Loading board…</div>

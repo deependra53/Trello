@@ -43,7 +43,7 @@ const attachmentSchema = new Schema(
 
 const coverSchema = new Schema(
   {
-    type: { type: String, enum: ['color', 'image', 'attachment'] },
+    type: { type: String, enum: ['color', 'gradient', 'image', 'attachment'] },
     value: { type: String },
     size: { type: String, enum: ['normal', 'full'], default: 'normal' },
     brightness: { type: String, enum: ['light', 'dark'], default: 'light' },

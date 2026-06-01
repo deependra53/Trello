@@ -37,11 +37,13 @@ export function Sidebar() {
       )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 top-16 z-30 w-64 transform border-r border-border/60 bg-background transition-transform md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:translate-x-0',
-          open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          'fixed inset-y-0 left-0 top-16 z-30 w-64 transform overflow-hidden border border-border/60 bg-background shadow-soft transition-[transform,width,margin,opacity,border-color] duration-200 ease-out md:static md:top-auto md:h-full md:translate-x-0 md:rounded-2xl md:shrink-0',
+          open
+            ? 'translate-x-0 md:w-64 md:opacity-100'
+            : '-translate-x-full md:w-0 md:-ml-3 md:border-transparent md:opacity-0 md:shadow-none',
         )}
       >
-        <nav className="flex h-full flex-col gap-1 p-3">
+        <nav className="flex h-full flex-col gap-1 overflow-y-auto p-3 scrollbar-thin">
           {items.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname?.startsWith(href + '/');
             return (

@@ -79,7 +79,7 @@ export function CalendarView({ board, onOpenCard }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-center gap-2 rounded-xl bg-white/95 p-3 shadow-soft">
+      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-3 shadow-soft">
         <h3 className="text-base font-semibold">{format(cursor, 'MMMM yyyy')}</h3>
         <div className="ml-auto flex items-center gap-1">
           <Button
@@ -104,8 +104,8 @@ export function CalendarView({ board, onOpenCard }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-xl bg-white/95 shadow-soft">
-        <div className="grid grid-cols-7 border-b text-xs font-semibold text-muted-foreground">
+      <div className="flex-1 overflow-hidden rounded-xl border border-border/60 bg-card shadow-soft">
+        <div className="grid grid-cols-7 border-b border-border/60 text-xs font-semibold text-muted-foreground">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
             <div key={d} className="px-2 py-2 text-center">
               {d}
@@ -113,7 +113,7 @@ export function CalendarView({ board, onOpenCard }: Props) {
           ))}
         </div>
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="grid h-[calc(100%-2.25rem)] grid-cols-7 grid-rows-6 divide-x divide-y">
+          <div className="grid h-[calc(100%-2.25rem)] grid-cols-7 grid-rows-6 divide-x divide-y divide-border/60">
             {days.map((d) => {
               const k = dayKey(d);
               const cards = cardsByDay.get(k) ?? [];
@@ -158,7 +158,7 @@ export function CalendarView({ board, onOpenCard }: Props) {
                                 {...p.dragHandleProps}
                                 onClick={() => onOpenCard(c._id)}
                                 className={cn(
-                                  'w-full rounded-md bg-card px-1.5 py-1 text-left text-[11px] shadow-soft transition hover:bg-accent/40',
+                                  'w-full rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[11px] transition hover:bg-accent/40',
                                   snap.isDragging && 'rotate-1 ring-2 ring-primary',
                                 )}
                               >

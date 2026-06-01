@@ -2,9 +2,46 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import type { BoardFull, Card, Comment, List } from '@/types/api';
+import type { BoardFull, Card, Comment, Label, List } from '@/types/api';
 import { applyCardMove, applyListMove } from '@/lib/board-reorder';
 import { trackPendingMove } from '@/lib/pending-moves';
+import { useAuthStore } from '@/stores/auth';
+
+function patchCardLocally(
+  qc: ReturnType<typeof useQueryClient>,
+  boardId: string,
+  cardId: string,
+  patch: Partial<Card>,
+) {
+  const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+  if (!prev) return prev;
+  qc.setQueryData<BoardFull>(['board', boardId], {
+    ...prev,
+    cards: prev.cards.map((c) => (c._id === cardId ? { ...c, ...patch } : c)),
+  });
+  return prev;
+}
+
+function prependOptimisticActivity(
+  qc: ReturnType<typeof useQueryClient>,
+  cardId: string,
+  type: string,
+  payload: Record<string, unknown>,
+) {
+  const userId = useAuthStore.getState().user?._id;
+  if (!userId) return;
+  const key = ['card', cardId, 'activity'] as const;
+  const prev = qc.getQueryData<CardActivity[]>(key) ?? [];
+  const entry: CardActivity = {
+    _id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    actorId: userId,
+    cardId,
+    payload,
+    createdAt: new Date().toISOString(),
+  };
+  qc.setQueryData<CardActivity[]>(key, [entry, ...prev]);
+}
 
 interface BoardKey {
   boardId: string;
@@ -137,6 +174,16 @@ export function useUpdateCard(boardId: string) {
   return useMutation({
     mutationFn: ({ cardId, patch }: { cardId: string; patch: Record<string, unknown> }) =>
       api<Card>(`/api/cards/${cardId}`, { method: 'PATCH', body: patch }),
+    onMutate: async ({ cardId, patch }) => {
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      patchCardLocally(qc, boardId, cardId, patch as Partial<Card>);
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+      toast.error('Update failed — reverted.');
+    },
     onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
   });
 }
@@ -217,3 +264,437 @@ export function useAddComment(cardId: string) {
     onSettled: () => qc.invalidateQueries({ queryKey: ['card', cardId, 'comments'] }),
   });
 }
+
+export function useUpdateComment(cardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ commentId, body }: { commentId: string; body: string }) =>
+      api<Comment>(`/api/cards/${cardId}/comments/${commentId}`, {
+        method: 'PATCH',
+        body: { body },
+      }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['card', cardId, 'comments'] }),
+  });
+}
+
+export function useDeleteComment(cardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) =>
+      api(`/api/cards/${cardId}/comments/${commentId}`, { method: 'DELETE' }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['card', cardId, 'comments'] }),
+  });
+}
+
+export function useToggleCardMember(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, userId }: { cardId: string; userId: string }) =>
+      api<Card>(`/api/cards/${cardId}/members`, { method: 'POST', body: { userId } }),
+    onMutate: async ({ cardId, userId }) => {
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      const card = prev?.cards.find((c) => c._id === cardId);
+      if (card) {
+        const has = card.members?.includes(userId);
+        const next = has
+          ? card.members?.filter((m) => m !== userId)
+          : [...(card.members ?? []), userId];
+        patchCardLocally(qc, boardId, cardId, { members: next });
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+
+export function useToggleCardLabel(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, labelId }: { cardId: string; labelId: string }) =>
+      api<Card>(`/api/cards/${cardId}/labels`, { method: 'POST', body: { labelId } }),
+    onMutate: async ({ cardId, labelId }) => {
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      const card = prev?.cards.find((c) => c._id === cardId);
+      if (card) {
+        const has = card.labels?.includes(labelId);
+        const next = has
+          ? card.labels?.filter((l) => l !== labelId)
+          : [...(card.labels ?? []), labelId];
+        patchCardLocally(qc, boardId, cardId, { labels: next });
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+
+export function useCreateLabel(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, color }: { name: string; color: string }) =>
+      api<Label>(`/api/boards/${boardId}/labels`, {
+        method: 'POST',
+        body: { name, color },
+      }),
+    onSuccess: (label) => {
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      if (prev) {
+        qc.setQueryData<BoardFull>(['board', boardId], {
+          ...prev,
+          labels: [...prev.labels, label],
+        });
+      }
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
+    },
+  });
+}
+
+export function useWatchCard(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cardId: string) =>
+      api<Card>(`/api/cards/${cardId}/watch`, { method: 'POST' }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+
+export function useAddChecklist(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, title }: { cardId: string; title: string }) =>
+      api<Card>(`/api/cards/${cardId}/checklists`, { method: 'POST', body: { title } }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+
+export function useUpdateChecklist(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      cardId,
+      checklistId,
+      patch,
+    }: {
+      cardId: string;
+      checklistId: string;
+      patch: { title?: string; position?: number };
+    }) =>
+      api<Card>(`/api/cards/${cardId}/checklists/${checklistId}`, {
+        method: 'PATCH',
+        body: patch,
+      }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+
+export function useDeleteChecklist(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, checklistId }: { cardId: string; checklistId: string }) =>
+      api(`/api/cards/${cardId}/checklists/${checklistId}`, { method: 'DELETE' }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+
+export function useAddChecklistItem(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      cardId,
+      checklistId,
+      text,
+    }: {
+      cardId: string;
+      checklistId: string;
+      text: string;
+    }) =>
+      api<Card>(`/api/cards/${cardId}/checklists/${checklistId}/items`, {
+        method: 'POST',
+        body: { text },
+      }),
+    onMutate: async ({ cardId, checklistId, text }) => {
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      const card = prev?.cards.find((c) => c._id === cardId);
+      if (card?.checklists) {
+        const tempId = `temp-${Date.now()}`;
+        const next = card.checklists.map((cl) =>
+          cl.id === checklistId
+            ? {
+                ...cl,
+                items: [
+                  ...cl.items,
+                  {
+                    id: tempId,
+                    text,
+                    completed: false,
+                    position: (cl.items.length + 1) * 65_536,
+                  },
+                ],
+              }
+            : cl,
+        );
+        patchCardLocally(qc, boardId, cardId, { checklists: next });
+      }
+      prependOptimisticActivity(qc, cardId, 'card.checklist.item.added', {
+        checklistId,
+        text,
+      });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+    },
+    onSettled: (_d, _e, vars) => {
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
+      qc.invalidateQueries({ queryKey: ['card', vars.cardId, 'activity'] });
+    },
+  });
+}
+
+export function useUpdateChecklistItem(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      cardId,
+      itemId,
+      patch,
+    }: {
+      cardId: string;
+      itemId: string;
+      patch: {
+        text?: string;
+        completed?: boolean;
+        memberId?: string | null;
+        dueDate?: string | null;
+      };
+    }) =>
+      api<Card>(`/api/cards/${cardId}/checklist-items/${itemId}`, {
+        method: 'PATCH',
+        body: patch,
+      }),
+    onMutate: async ({ cardId, itemId, patch }) => {
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      const card = prev?.cards.find((c) => c._id === cardId);
+      let foundItem: { text: string; completed: boolean; memberId?: string | null; dueDate?: string | null; checklistId: string } | undefined;
+      if (card?.checklists) {
+        for (const cl of card.checklists) {
+          const it = cl.items.find((i) => i.id === itemId);
+          if (it) {
+            foundItem = {
+              text: it.text,
+              completed: it.completed,
+              memberId: it.memberId ?? null,
+              dueDate: it.dueDate ?? null,
+              checklistId: cl.id,
+            };
+            break;
+          }
+        }
+        const next = card.checklists.map((cl) => ({
+          ...cl,
+          items: cl.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)),
+        }));
+        patchCardLocally(qc, boardId, cardId, { checklists: next });
+      }
+      if (foundItem) {
+        const base = { checklistId: foundItem.checklistId, itemId, text: foundItem.text };
+        if (patch.completed !== undefined && patch.completed !== foundItem.completed) {
+          prependOptimisticActivity(
+            qc,
+            cardId,
+            patch.completed
+              ? 'card.checklist.item.completed'
+              : 'card.checklist.item.uncompleted',
+            base,
+          );
+        } else if (patch.memberId !== undefined && (patch.memberId ?? null) !== foundItem.memberId) {
+          prependOptimisticActivity(
+            qc,
+            cardId,
+            patch.memberId
+              ? 'card.checklist.item.assigned'
+              : 'card.checklist.item.unassigned',
+            { ...base, memberId: patch.memberId ?? null },
+          );
+        } else if (patch.dueDate !== undefined && (patch.dueDate ?? null) !== foundItem.dueDate) {
+          prependOptimisticActivity(
+            qc,
+            cardId,
+            patch.dueDate ? 'card.checklist.item.due-set' : 'card.checklist.item.due-cleared',
+            { ...base, dueDate: patch.dueDate ?? null },
+          );
+        }
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+    },
+    onSettled: (_d, _e, vars) => {
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
+      qc.invalidateQueries({ queryKey: ['card', vars.cardId, 'activity'] });
+    },
+  });
+}
+
+export function useDeleteChecklistItem(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, itemId }: { cardId: string; itemId: string }) =>
+      api(`/api/cards/${cardId}/checklist-items/${itemId}`, { method: 'DELETE' }),
+    onMutate: async ({ cardId, itemId }) => {
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      const card = prev?.cards.find((c) => c._id === cardId);
+      let removed: { text: string; checklistId: string } | undefined;
+      if (card?.checklists) {
+        for (const cl of card.checklists) {
+          const it = cl.items.find((i) => i.id === itemId);
+          if (it) {
+            removed = { text: it.text, checklistId: cl.id };
+            break;
+          }
+        }
+        const next = card.checklists.map((cl) => ({
+          ...cl,
+          items: cl.items.filter((it) => it.id !== itemId),
+        }));
+        patchCardLocally(qc, boardId, cardId, { checklists: next });
+      }
+      if (removed) {
+        prependOptimisticActivity(qc, cardId, 'card.checklist.item.deleted', {
+          checklistId: removed.checklistId,
+          itemId,
+          text: removed.text,
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+    },
+    onSettled: (_d, _e, vars) => {
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
+      qc.invalidateQueries({ queryKey: ['card', vars.cardId, 'activity'] });
+    },
+  });
+}
+
+export function useConvertChecklistItem(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, itemId }: { cardId: string; itemId: string }) =>
+      api<Card>(`/api/cards/${cardId}/checklist-items/${itemId}/convert`, { method: 'POST' }),
+    onSettled: (_d, _e, vars) => {
+      qc.invalidateQueries({ queryKey: ['board', boardId] });
+      qc.invalidateQueries({ queryKey: ['card', vars.cardId, 'activity'] });
+    },
+  });
+}
+
+export interface CardActivity {
+  _id: string;
+  type: string;
+  actorId: string;
+  cardId?: string;
+  payload?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export function useCardActivity(cardId: string | undefined) {
+  return useQuery({
+    queryKey: ['card', cardId, 'activity'],
+    enabled: !!cardId,
+    queryFn: () =>
+      api<{ items: CardActivity[]; nextCursor?: string }>(`/api/cards/${cardId}/activity`).then(
+        (r) => r.items,
+      ),
+  });
+}
+
+export function useAddAttachment(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cardId, file }: { cardId: string; file: File }) => {
+      // 1) Ask backend how to upload. S3/Cloudinary return a presigned PUT URL;
+      //    the local-disk provider returns { provider: 'local' } and we POST multipart instead.
+      const presign = await api<
+        | { uploadUrl: string; publicUrl: string; key: string; expiresIn: number }
+        | { provider: 'local'; method: 'POST' }
+      >(`/api/cards/${cardId}/attachments/sign`, {
+        method: 'POST',
+        body: { name: file.name, mimeType: file.type || 'application/octet-stream' },
+      });
+
+      if (!('uploadUrl' in presign)) {
+        // Local provider — stream the file through the backend.
+        const form = new FormData();
+        form.append('file', file);
+        return api<{ id: string; name: string; url: string }>(
+          `/api/cards/${cardId}/attachments`,
+          { method: 'POST', body: form },
+        );
+      }
+
+      // 2) PUT the file straight to S3 — bytes never touch our server.
+      const putRes = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      });
+      if (!putRes.ok) {
+        throw new Error(`S3 upload failed (${putRes.status})`);
+      }
+
+      // 3) Register the attachment metadata on the card.
+      return api<{ id: string; name: string; url: string }>(
+        `/api/cards/${cardId}/attachments/register`,
+        {
+          method: 'POST',
+          body: {
+            name: file.name,
+            url: presign.publicUrl,
+            key: presign.key,
+            mimeType: file.type || undefined,
+            size: file.size,
+          },
+        },
+      );
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+
+export function useDeleteAttachment(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, attachmentId }: { cardId: string; attachmentId: string }) =>
+      api(`/api/cards/${cardId}/attachments/${attachmentId}`, { method: 'DELETE' }),
+    onMutate: async ({ cardId, attachmentId }) => {
+      await qc.cancelQueries({ queryKey: ['board', boardId] });
+      const prev = qc.getQueryData<BoardFull>(['board', boardId]);
+      const card = prev?.cards.find((c) => c._id === cardId);
+      if (card?.attachments) {
+        patchCardLocally(qc, boardId, cardId, {
+          attachments: card.attachments.filter((a) => a.id !== attachmentId),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['board', boardId], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
+  });
+}
+

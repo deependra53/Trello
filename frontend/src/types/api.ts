@@ -65,8 +65,8 @@ export interface ChecklistItem {
   id: string;
   text: string;
   completed: boolean;
-  memberId?: string;
-  dueDate?: string;
+  memberId?: string | null;
+  dueDate?: string | null;
   position: number;
 }
 
@@ -100,7 +100,7 @@ export interface Card {
   startDate?: string;
   dueDate?: string;
   dueComplete?: boolean;
-  cover?: { type: 'color' | 'image' | 'attachment'; value: string; size?: 'normal' | 'full'; brightness?: 'light' | 'dark' } | null;
+  cover?: { type: 'color' | 'gradient' | 'image' | 'attachment'; value: string; size?: 'normal' | 'full'; brightness?: 'light' | 'dark' } | null;
   checklists?: Checklist[];
   attachments?: Attachment[];
   watchers?: string[];
@@ -142,8 +142,16 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface BoardMemberProfile {
+  _id: string;
+  fullName: string;
+  email: string;
+  avatarUrl?: string;
+}
+
 export interface BoardFull extends Board {
   lists: List[];
   cards: Card[];
   labels: Label[];
+  memberProfiles?: BoardMemberProfile[];
 }

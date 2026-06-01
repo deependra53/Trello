@@ -81,7 +81,7 @@ export function KanbanView({ board, onOpenCard }: Props) {
     <DragDropContext onDragEnd={onDragEnd}>
       {/* Outer flex container — AddListForm sits outside the Droppable so the
           library's placeholder is always the last child of the droppable. */}
-      <div className="flex flex-1 items-start gap-3 overflow-x-auto p-4 pb-8 scrollbar-thin">
+      <div className="flex h-full items-start gap-3 overflow-x-auto overflow-y-hidden p-4 pb-8 scrollbar-thin">
         <Droppable droppableId="board" type="list" direction="horizontal">
           {(provided) => (
             <div

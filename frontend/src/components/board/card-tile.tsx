@@ -1,9 +1,12 @@
 'use client';
-import { CheckSquare, Clock, MessageCircle, Paperclip } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, CheckSquare, Circle, Clock, MessageCircle, Paperclip } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Card, Label } from '@/types/api';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useUpdateCard } from '@/hooks/use-cards';
+import { useUIStore } from '@/stores/ui';
 
 interface Props {
   card: Card;
@@ -23,6 +26,10 @@ function dueColor(dueDate?: string, dueComplete?: boolean) {
 }
 
 export function CardTile({ card, labels, onOpen, isDragging }: Props) {
+  const updateCard = useUpdateCard(card.boardId);
+  const labelsExpanded = useUIStore((s) => s.labelsExpanded);
+  const toggleLabelsExpanded = useUIStore((s) => s.toggleLabelsExpanded);
+  const [bouncing, setBouncing] = useState(false);
   const cardLabels = labels?.filter((l) => card.labels?.includes(l._id)) ?? [];
   const checklistTotal = (card.checklists ?? []).reduce((a, c) => a + (c.items?.length ?? 0), 0);
   const checklistDone = (card.checklists ?? []).reduce(
@@ -31,8 +38,16 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
   );
   const dueCls = dueColor(card.dueDate, card.dueComplete);
 
+  function toggleComplete(e: React.MouseEvent | React.KeyboardEvent) {
+    e.stopPropagation();
+    setBouncing(true);
+    updateCard.mutate({ cardId: card._id, patch: { dueComplete: !card.dueComplete } });
+  }
+
   const coverColor =
     card.cover?.type === 'color' ? card.cover.value : undefined;
+  const coverGradient =
+    card.cover?.type === 'gradient' ? card.cover.value : undefined;
   const coverImage =
     card.cover?.type === 'image' || card.cover?.type === 'attachment'
       ? card.cover.value
@@ -52,26 +67,90 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
         }
       }}
       className={cn(
-        'w-full overflow-hidden rounded-lg bg-card text-left shadow-soft transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary',
+        'group relative w-full overflow-hidden rounded-lg bg-card text-left shadow-soft transition-shadow duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary',
         isDragging && 'rotate-2 ring-2 ring-primary/60 shadow-glow',
       )}
     >
       {coverColor && <div className="h-8" style={{ backgroundColor: coverColor }} />}
+      {coverGradient && <div className="h-8" style={{ backgroundImage: coverGradient }} />}
       {coverImage && <img src={coverImage} alt="" className="h-24 w-full object-cover" />}
       <div className="space-y-2 p-3">
         {cardLabels.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {cardLabels.map((l) => (
-              <span
-                key={l._id}
-                className="h-2 w-8 rounded-full"
-                style={{ backgroundColor: l.color }}
-                title={l.name}
-              />
-            ))}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLabelsExpanded();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleLabelsExpanded();
+              }
+            }}
+            aria-label={labelsExpanded ? 'Collapse labels' : 'Expand labels'}
+            title={labelsExpanded ? 'Collapse labels' : 'Expand labels'}
+            className="-mx-0.5 flex flex-wrap gap-1 rounded px-0.5 focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            {cardLabels.map((l) =>
+              labelsExpanded ? (
+                <span
+                  key={l._id}
+                  className="inline-flex h-5 max-w-[12rem] items-center truncate rounded px-2 text-[11px] font-semibold leading-none text-white shadow-sm"
+                  style={{ backgroundColor: l.color }}
+                  title={l.name}
+                >
+                  {l.name || ' '}
+                </span>
+              ) : (
+                <span
+                  key={l._id}
+                  className="h-2 w-8 rounded-full"
+                  style={{ backgroundColor: l.color }}
+                  title={l.name}
+                />
+              ),
+            )}
           </div>
         )}
-        <p className="text-sm font-medium leading-snug">{card.title}</p>
+        <div className="relative pl-[1.625rem] text-sm font-medium leading-snug">
+          <button
+            type="button"
+            onClick={toggleComplete}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') toggleComplete(e);
+            }}
+            aria-label={card.dueComplete ? 'Mark incomplete' : 'Mark complete'}
+            title={card.dueComplete ? 'Mark incomplete' : 'Mark complete'}
+            className={cn(
+              'absolute left-0 top-0 grid h-5 w-5 place-items-center rounded-full transition-opacity duration-200 ease-out',
+              card.dueComplete ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+            )}
+          >
+            <span
+              className={cn('inline-flex', bouncing && 'animate-check-pop')}
+              onAnimationEnd={() => setBouncing(false)}
+            >
+              {card.dueComplete ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              ) : (
+                <Circle className="h-5 w-5 text-muted-foreground" strokeWidth={2} />
+              )}
+            </span>
+          </button>
+          <span
+            className={cn(
+              'block transition-transform duration-200 ease-out [overflow-wrap:anywhere]',
+              card.dueComplete
+                ? 'translate-x-0'
+                : '-translate-x-[1.625rem] group-hover:translate-x-0',
+            )}
+          >
+            {card.title}
+          </span>
+        </div>
         {(card.description ||
           card.dueDate ||
           (card.members && card.members.length > 0) ||
