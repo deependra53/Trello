@@ -16,7 +16,8 @@ describe('workspaces', () => {
       .get('/api/workspaces')
       .set('Authorization', `Bearer ${user.token}`);
     expect(listRes.status).toBe(200);
-    expect(listRes.body.items.length).toBe(1);
+    // One org is auto-created at signup, plus the 'Acme' workspace created above.
+    expect(listRes.body.items.length).toBe(2);
   });
 
   it('returns 401 without auth', async () => {

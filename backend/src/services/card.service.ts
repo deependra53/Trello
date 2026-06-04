@@ -4,6 +4,7 @@ import { Card } from '../models/card.model.js';
 import { List } from '../models/list.model.js';
 import { Comment } from '../models/comment.model.js';
 import { Notification } from '../models/notification.model.js';
+import { User } from '../models/user.model.js';
 import { BadRequest, NotFound } from '../utils/errors.js';
 import {
   computeBetween,
@@ -20,16 +21,33 @@ export async function getById(id: string) {
   return card;
 }
 
+export interface CardExtras {
+  /** Attachments to seed the card with (e.g. files carried over from a chat message). */
+  attachments?: Array<{ name: string; url: string; mimeType?: string; size?: number }>;
+  /** Optional cover, e.g. the first image attachment shown on the card tile. */
+  cover?: { type: 'color' | 'gradient' | 'image' | 'attachment'; value: string; size?: 'normal' | 'full'; brightness?: 'light' | 'dark' };
+}
+
 export async function create(
   listId: string,
   title: string,
   description: string,
   position: number | undefined,
   actorId: string,
+  extras?: CardExtras,
 ) {
   const list = await List.findById(listId);
   if (!list) throw NotFound('List not found');
   const pos = position ?? (await nextPosition(listId));
+  const attachments = (extras?.attachments ?? []).map((a) => ({
+    id: crypto.randomUUID(),
+    name: a.name,
+    url: a.url,
+    mimeType: a.mimeType,
+    size: a.size,
+    uploadedBy: new Types.ObjectId(actorId),
+    uploadedAt: new Date(),
+  }));
   const card = await Card.create({
     listId,
     boardId: list.boardId,
@@ -37,6 +55,8 @@ export async function create(
     description,
     position: pos,
     watchers: [actorId],
+    attachments,
+    ...(extras?.cover ? { cover: extras.cover } : {}),
   });
   await logActivity({
     boardId: card.boardId,
@@ -536,6 +556,22 @@ export async function addComment(
     actorId: authorId,
     type: 'card.comment.added',
     payload: { commentId: comment._id, body: body.slice(0, 200) },
+  });
+  // Broadcast the full comment to everyone viewing the board, so an open card
+  // appends it live and other cards can flash. Carries the author's name/avatar
+  // so clients need no extra lookup.
+  const author = await User.findById(authorId).select('fullName avatarUrl').lean();
+  emitBoard({
+    boardId: String(card.boardId),
+    type: 'card.comment.created',
+    actorId: authorId,
+    payload: {
+      cardId: String(card._id),
+      comment: comment.toJSON(),
+      author: author
+        ? { _id: String(author._id), fullName: author.fullName, avatarUrl: author.avatarUrl }
+        : undefined,
+    },
   });
   // Notify mentioned users and watchers (excluding the commenter)
   const notifyUsers = new Set<string>();

@@ -21,16 +21,6 @@ export const reactionSchema = z.object({
   emoji: z.string().min(1).max(16),
 });
 
-export const inboxCaptureSchema = z.object({
-  title: z.string().min(1).max(500),
-  body: z.string().max(20000).default(''),
-});
-
-export const inboxConvertSchema = z.object({
-  boardId: objectIdSchema,
-  listId: objectIdSchema,
-});
-
 export const fromTemplateSchema = z.object({
   workspaceId: objectIdSchema,
   title: z.string().min(1).max(200),

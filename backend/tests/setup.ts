@@ -9,6 +9,8 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-test-refresh';
 process.env.MONGODB_URI = 'mongodb://placeholder/test';
 process.env.SMTP_HOST = '';
 process.env.LOG_LEVEL = 'silent';
+// Keep uploads hermetic — never hit real S3 from the test suite.
+process.env.UPLOAD_PROVIDER = 'local';
 
 let mongo: MongoMemoryServer;
 

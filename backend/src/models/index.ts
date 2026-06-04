@@ -1,6 +1,10 @@
 export * from './user.model.js';
 export * from './refreshToken.model.js';
 export * from './workspace.model.js';
+export * from './invite.model.js';
+export * from './boardInvite.model.js';
+export * from './channel.model.js';
+export * from './message.model.js';
 export * from './board.model.js';
 export * from './list.model.js';
 export * from './card.model.js';
@@ -9,5 +13,4 @@ export * from './comment.model.js';
 export * from './activity.model.js';
 export * from './notification.model.js';
 export * from './automation.model.js';
-export * from './inboxItem.model.js';
 export * from './template.model.js';

@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { Workspace, type WorkspaceDoc, type WorkspaceRole } from '../models/workspace.model.js';
 import { Board, type BoardDoc, type BoardRole } from '../models/board.model.js';
+import { Channel, type ChannelDoc } from '../models/channel.model.js';
 import { List } from '../models/list.model.js';
 import { Card } from '../models/card.model.js';
 import { Forbidden, NotFound } from '../utils/errors.js';
@@ -14,6 +15,11 @@ export interface WorkspaceRequest extends AuthedRequest {
 export interface BoardRequest extends AuthedRequest {
   board: BoardDoc;
   boardRole: BoardRole | 'workspace-member';
+}
+
+export interface ChannelRequest extends AuthedRequest {
+  channel: ChannelDoc;
+  isChannelMember: boolean;
 }
 
 export function workspaceMembership(doc: WorkspaceDoc, userId: string): WorkspaceRole | null {
@@ -69,15 +75,21 @@ export const requireBoardRole =
       if (!board) return next(NotFound('Board not found'));
       const userId = (req as AuthedRequest).user.sub;
       let role: BoardRole | null = boardMembership(board, userId);
-      if (!role && board.visibility === 'workspace') {
+      if (!role) {
+        // No explicit board membership — derive access from the user's org role
+        // and the board's visibility.
         const ws = await Workspace.findById(board.workspaceId);
-        if (ws && workspaceMembership(ws, userId)) {
+        const wsRole = ws ? workspaceMembership(ws, userId) : null;
+        if (wsRole === 'owner') {
+          // The organization owner can always manage boards within their org.
+          role = 'admin';
+        } else if (board.visibility === 'workspace' && wsRole && wsRole !== 'guest') {
+          // Workspace-visible boards are open to every full org member (not guests).
           role = 'member';
+        } else if (board.visibility === 'public') {
+          // Public boards: read-only "observer" for anyone with the link.
+          role = 'observer';
         }
-      }
-      if (!role && board.visibility === 'public') {
-        // public boards: read-only "observer"
-        role = 'observer';
       }
       if (!role) return next(Forbidden('Not a board member'));
       const effectiveRole: BoardRole = role;
@@ -86,6 +98,45 @@ export const requireBoardRole =
         return next(Forbidden('Insufficient board role'));
       (req as BoardRequest).board = board;
       (req as BoardRequest).boardRole = effectiveRole;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+/**
+ * Load a chat channel and verify the user can access it.
+ * Members always pass; for public (non-private) channels, any org member passes
+ * (so they can read/join). Private channels & DMs require explicit membership.
+ */
+export const requireChannelAccess =
+  (opts: { allowPublicNonMember?: boolean } = {}) =>
+  async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const id = req.params.channelId ?? req.params.id;
+      if (!id) return next(NotFound('Channel id required'));
+      const channel = await Channel.findById(id);
+      if (!channel) return next(NotFound('Channel not found'));
+      const userId = (req as AuthedRequest).user.sub;
+      const member = channel.members?.some((m) => String(m.userId) === userId) ?? false;
+
+      if (!member) {
+        const publicChannel = channel.kind === 'channel' && !channel.isPrivate;
+        if (!publicChannel || opts.allowPublicNonMember === false) {
+          return next(Forbidden('You are not a member of this conversation'));
+        }
+        // Public channel: caller must be a full org member. Guests (e.g. someone
+        // who joined via a board invite) have no chat access until an admin adds
+        // them to a channel explicitly.
+        const ws = await Workspace.findById(channel.workspaceId);
+        const role = ws ? workspaceMembership(ws, userId) : null;
+        if (!role || role === 'guest') {
+          return next(Forbidden('You are not a member of this conversation'));
+        }
+      }
+
+      (req as ChannelRequest).channel = channel;
+      (req as ChannelRequest).isChannelMember = member;
       next();
     } catch (err) {
       next(err);

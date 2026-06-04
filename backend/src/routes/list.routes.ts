@@ -8,7 +8,7 @@ import {
   moveListSchema,
   copyListSchema,
 } from '../validators/list.validator.js';
-import { createCardSchema } from '../validators/card.validator.js';
+import { createCardSchema, createCardFromMessageSchema } from '../validators/card.validator.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -24,6 +24,13 @@ router.post(
   requireListAccess('admin', 'member'),
   validate(createCardSchema),
   ctrl.createCard,
+);
+
+router.post(
+  '/:listId/cards/from-message',
+  requireListAccess('admin', 'member'),
+  validate(createCardFromMessageSchema),
+  ctrl.createCardFromMessage,
 );
 
 export default router;

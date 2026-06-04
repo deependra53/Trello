@@ -2,8 +2,10 @@ import * as svc from '../services/board.service.js';
 import * as labelSvc from '../services/label.service.js';
 import * as listSvc from '../services/list.service.js';
 import * as automationSvc from '../services/automation.service.js';
+import * as inviteSvc from '../services/boardInvite.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import type { BoardRequest } from '../middleware/authorize.middleware.js';
+import type { AuthedRequest } from '../middleware/auth.middleware.js';
 import { Activity } from '../models/activity.model.js';
 
 export const get = asyncHandler<BoardRequest>(async (req, res) => {
@@ -64,6 +66,65 @@ export const removeMember = asyncHandler<BoardRequest>(async (req, res) => {
     req.user.sub,
   );
   res.json(b);
+});
+
+// ---- Sharing: link + email invites -------------------------------------------
+
+export const getShareLink = asyncHandler<BoardRequest>(async (req, res) => {
+  const link = await inviteSvc.getShareLink(String(req.board._id));
+  res.json(link);
+});
+
+export const enableShareLink = asyncHandler<BoardRequest>(async (req, res) => {
+  const body = req.body as { regenerate?: boolean; role?: 'admin' | 'member' | 'observer' };
+  const link = await inviteSvc.enableShareLink(String(req.board._id), req.user.sub, {
+    regenerate: body.regenerate,
+    role: body.role,
+  });
+  res.status(201).json(link);
+});
+
+export const disableShareLink = asyncHandler<BoardRequest>(async (req, res) => {
+  await inviteSvc.disableShareLink(String(req.board._id));
+  res.status(204).end();
+});
+
+export const listInvites = asyncHandler<BoardRequest>(async (req, res) => {
+  const items = await inviteSvc.listEmailInvites(String(req.board._id));
+  res.json({ items });
+});
+
+export const createInvite = asyncHandler<BoardRequest>(async (req, res) => {
+  const { email, role } = req.body as { email: string; role: 'admin' | 'member' | 'observer' };
+  const { invite } = await inviteSvc.createEmailInvite(
+    String(req.board._id),
+    email,
+    role,
+    req.user.sub,
+  );
+  res.status(201).json(invite);
+});
+
+export const revokeInvite = asyncHandler<BoardRequest>(async (req, res) => {
+  await inviteSvc.revokeEmailInvite(String(req.board._id), req.params.inviteId as string);
+  res.status(204).end();
+});
+
+// Accept (any authenticated user) — joins the board, no prior board access needed.
+export const acceptInvite = asyncHandler<AuthedRequest>(async (req, res) => {
+  const { token } = req.body as { token: string };
+  const result = await inviteSvc.acceptInvite(token, req.user.sub);
+  res.json(result);
+});
+
+// Public preview so the join page can render before the user signs in.
+export const inviteInfo = asyncHandler(async (req, res) => {
+  const preview = await inviteSvc.previewInvite(req.params.token as string);
+  if (!preview) {
+    res.status(404).json({ valid: false });
+    return;
+  }
+  res.json(preview);
 });
 
 // ---- Lists nested under board -----------------------------------------------

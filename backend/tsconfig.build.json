@@ -2,7 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "declaration": true,
+    // This is a deployable app (run as `node dist/server.js`), not a consumed library,
+    // so we don't emit .d.ts files. Emitting them fails under pnpm with TS2742 because
+    // Express/qs handler types resolve through non-portable nested .pnpm paths.
+    "declaration": false,
     "sourceMap": true
   },
   "exclude": ["node_modules", "dist", "tests", "**/*.test.ts"]

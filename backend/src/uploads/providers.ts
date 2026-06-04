@@ -43,6 +43,18 @@ function buildObjectKey(folder: string, originalName: string): string {
   return `${safeFolder}/${crypto.randomBytes(12).toString('hex')}${ext}`;
 }
 
+/**
+ * Build a Content-Disposition header so downloads keep the ORIGINAL filename
+ * (the object key is a random hash). Images use `inline` so they still render in
+ * <img>/new tabs; other files use `attachment` to download. RFC 5987 `filename*`
+ * carries the exact UTF-8 name, with an ASCII fallback for older clients.
+ */
+function contentDisposition(originalName: string, mimeType: string): string {
+  const kind = mimeType.startsWith('image/') ? 'inline' : 'attachment';
+  const asciiFallback = originalName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  return `${kind}; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
+}
+
 // ---- Local disk provider ----------------------------------------------------
 
 const LOCAL_ROOT = path.resolve('uploads');
@@ -141,6 +153,7 @@ class S3Provider implements UploadProvider {
         Key: key,
         Body: opts.buffer,
         ContentType: opts.mimeType,
+        ContentDisposition: contentDisposition(opts.originalName, opts.mimeType),
       }),
     );
     return {

@@ -39,6 +39,29 @@ export async function getById(id: string) {
   return ws;
 }
 
+export async function listMembers(workspaceId: string) {
+  const ws = await Workspace.findById(workspaceId).lean();
+  if (!ws) throw NotFound('Workspace not found');
+  const memberIds = (ws.members ?? []).map((m) => String(m.userId));
+  const users = memberIds.length
+    ? await User.find({ _id: { $in: memberIds } })
+        .select('fullName email avatarUrl')
+        .lean()
+    : [];
+  const profileById = new Map(
+    users.map((u) => [
+      String(u._id),
+      { _id: String(u._id), fullName: u.fullName, email: u.email, avatarUrl: u.avatarUrl },
+    ]),
+  );
+  return (ws.members ?? []).map((m) => ({
+    userId: String(m.userId),
+    role: m.role,
+    joinedAt: m.joinedAt,
+    profile: profileById.get(String(m.userId)),
+  }));
+}
+
 export async function update(id: string, patch: Partial<CreateInput> & { logoUrl?: string }) {
   const ws = await Workspace.findByIdAndUpdate(id, { $set: patch }, { new: true });
   if (!ws) throw NotFound('Workspace not found');

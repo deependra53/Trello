@@ -11,7 +11,13 @@ import {
   hashToken,
 } from './token.service.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from './email.service.js';
+import { create as createWorkspace } from './workspace.service.js';
+import { acceptInvite } from './invite.service.js';
+import { acceptInvite as acceptBoardInvite } from './boardInvite.service.js';
 import { BadRequest, Conflict, NotFound, Unauthorized } from '../utils/errors.js';
+import { Workspace, type WorkspaceDoc } from '../models/workspace.model.js';
+import { getUploadProvider } from '../uploads/providers.js';
+import type { UpdateProfileInput } from '../validators/auth.validator.js';
 
 const BCRYPT_ROUNDS = 12;
 const VERIFY_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -26,6 +32,13 @@ export interface AuthResult {
   user: UserDoc;
   accessToken: string;
   refreshToken: string;
+  workspace?: WorkspaceDoc;
+}
+
+export interface SignupOptions {
+  organizationName?: string;
+  inviteToken?: string;
+  boardInviteToken?: string;
 }
 
 export async function signup(
@@ -33,6 +46,7 @@ export async function signup(
   password: string,
   fullName: string,
   ctx: RequestContext,
+  opts: SignupOptions = {},
 ): Promise<AuthResult> {
   const existing = await User.findOne({ email });
   if (existing) throw Conflict('An account with this email already exists');
@@ -51,9 +65,26 @@ export async function signup(
   // Send verification — fail silently in dev so signup never blocks
   sendVerificationEmail(email, fullName, verificationToken).catch(() => undefined);
 
+  // Join the inviting org (workspace or board invite), or create a brand-new one.
+  let workspace: WorkspaceDoc;
+  if (opts.inviteToken) {
+    workspace = await acceptInvite(opts.inviteToken, String(user._id));
+  } else if (opts.boardInviteToken) {
+    // Board invite: join the board (as a member) and its org as a guest — no
+    // personal org is created, so the user only sees the board they were added to.
+    const { workspaceId } = await acceptBoardInvite(opts.boardInviteToken, String(user._id));
+    const ws = await Workspace.findById(workspaceId);
+    if (!ws) throw NotFound('Organization not found');
+    workspace = ws;
+  } else {
+    workspace = await createWorkspace(String(user._id), {
+      name: opts.organizationName ?? `${fullName}'s Organization`,
+    });
+  }
+
   const accessToken = signAccessToken({ sub: String(user._id), email: user.email });
   const refreshToken = await issueRefreshToken({ userId: String(user._id), ...ctx });
-  return { user, accessToken, refreshToken };
+  return { user, accessToken, refreshToken, workspace };
 }
 
 export async function login(
@@ -137,5 +168,69 @@ export async function resetPassword(token: string, newPassword: string): Promise
 export async function getMe(userId: string): Promise<UserDoc> {
   const user = await User.findById(userId);
   if (!user) throw NotFound('User not found');
+  return user;
+}
+
+/**
+ * Patch the signed-in user's own profile. Only the provided fields change;
+ * preferences are merged path-by-path so updating one notification toggle never
+ * clobbers the others.
+ */
+export async function updateProfile(userId: string, patch: UpdateProfileInput): Promise<UserDoc> {
+  const user = await User.findById(userId);
+  if (!user) throw NotFound('User not found');
+
+  if (patch.fullName !== undefined) user.fullName = patch.fullName;
+
+  if (patch.preferences) {
+    const p = patch.preferences;
+    if (p.theme !== undefined) user.set('preferences.theme', p.theme);
+    if (p.language !== undefined) user.set('preferences.language', p.language);
+    if (p.notifications) {
+      for (const [key, value] of Object.entries(p.notifications)) {
+        if (value !== undefined) user.set(`preferences.notifications.${key}`, value);
+      }
+    }
+  }
+
+  await user.save();
+  return user;
+}
+
+/**
+ * Change the password of a signed-in user (knows their current password). We
+ * deliberately do NOT revoke refresh tokens here — that would sign the user out
+ * of the very session they're using. The recovery flow (resetPassword) revokes;
+ * a voluntary in-session change keeps the session alive.
+ */
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await User.findById(userId).select('+passwordHash');
+  if (!user) throw NotFound('User not found');
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!ok) throw BadRequest('Current password is incorrect');
+  user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await user.save();
+}
+
+/** Store an uploaded image as the user's avatar and return the updated user. */
+export async function updateAvatar(
+  userId: string,
+  file: { buffer: Buffer; originalName: string; mimeType: string },
+): Promise<UserDoc> {
+  if (!file.mimeType.startsWith('image/')) throw BadRequest('Avatar must be an image');
+  const user = await User.findById(userId);
+  if (!user) throw NotFound('User not found');
+  const stored = await getUploadProvider().store({
+    buffer: file.buffer,
+    originalName: file.originalName,
+    mimeType: file.mimeType,
+    folder: 'avatars',
+  });
+  user.avatarUrl = stored.url;
+  await user.save();
   return user;
 }

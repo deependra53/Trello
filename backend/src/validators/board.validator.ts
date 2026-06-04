@@ -36,6 +36,20 @@ export const copyBoardSchema = z.object({
   keepCards: z.boolean().default(true),
 });
 
+export const createBoardInviteSchema = z.object({
+  email: z.string().email().toLowerCase().trim(),
+  role: z.enum(['admin', 'member', 'observer']).default('member'),
+});
+
+export const shareLinkSchema = z.object({
+  regenerate: z.boolean().optional(),
+  role: z.enum(['admin', 'member', 'observer']).optional(),
+});
+
+export const acceptBoardInviteSchema = z.object({
+  token: z.string().min(8),
+});
+
 export const customFieldSchema = z.object({
   name: z.string().min(1).max(80),
   type: z.enum(['text', 'number', 'date', 'checkbox', 'dropdown']),

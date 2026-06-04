@@ -8,12 +8,22 @@ import {
   addBoardMemberSchema,
   updateBoardMemberSchema,
   copyBoardSchema,
+  createBoardInviteSchema,
+  shareLinkSchema,
+  acceptBoardInviteSchema,
 } from '../validators/board.validator.js';
 import { createListSchema } from '../validators/list.validator.js';
 import { labelSchema, updateLabelSchema, automationSchema, updateAutomationSchema } from '../validators/misc.validator.js';
 
 const router = Router();
+
+// Public: preview an invite (no auth, so the join page renders before sign-in).
+router.get('/invite-info/:token', ctrl.inviteInfo);
+
 router.use(requireAuth);
+
+// Accept an invite — any signed-in user, no prior board access required.
+router.post('/accept-invite', validate(acceptBoardInviteSchema), ctrl.acceptInvite);
 
 router.get('/:id', requireBoardRole('admin', 'member', 'observer'), ctrl.get);
 router.patch('/:id', requireBoardRole('admin', 'member'), validate(updateBoardSchema), ctrl.update);
@@ -36,6 +46,26 @@ router.patch(
   ctrl.updateMember,
 );
 router.delete('/:id/members/:userId', requireBoardRole('admin'), ctrl.removeMember);
+
+// Sharing — reusable link
+router.get('/:id/share-link', requireBoardRole('admin'), ctrl.getShareLink);
+router.post(
+  '/:id/share-link',
+  requireBoardRole('admin'),
+  validate(shareLinkSchema),
+  ctrl.enableShareLink,
+);
+router.delete('/:id/share-link', requireBoardRole('admin'), ctrl.disableShareLink);
+
+// Sharing — per-email invites
+router.get('/:id/invites', requireBoardRole('admin'), ctrl.listInvites);
+router.post(
+  '/:id/invites',
+  requireBoardRole('admin'),
+  validate(createBoardInviteSchema),
+  ctrl.createInvite,
+);
+router.delete('/:id/invites/:inviteId', requireBoardRole('admin'), ctrl.revokeInvite);
 
 // Lists
 router.get('/:id/lists', requireBoardRole('admin', 'member', 'observer'), ctrl.listLists);

@@ -12,12 +12,12 @@ async function main() {
   const app = createApp();
   const server = createServer(app);
 
-  setupSockets(server);
+  await setupSockets(server);
   startAutomationEngine();
   startDueReminderCron();
 
   server.listen(env.PORT, env.HOST, () => {
-    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'TrelloX backend listening');
+    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'IndiHive backend listening');
   });
 }
 

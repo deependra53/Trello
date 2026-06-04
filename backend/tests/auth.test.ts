@@ -8,6 +8,7 @@ const newUser = () => ({
   email: `u${Date.now()}${Math.random().toString(36).slice(2, 6)}@test.dev`,
   password: 'supersecret1',
   fullName: 'Test User',
+  organizationName: 'Test Org',
 });
 
 describe('POST /api/auth/signup', () => {

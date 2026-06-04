@@ -3,7 +3,19 @@ import { Server, type Socket } from 'socket.io';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { verifyAccessToken } from '../services/token.service.js';
-import { bus, BOARD_EVENT, USER_EVENT, type BoardEvent, type UserEvent } from '../realtime/bus.js';
+import { Workspace } from '../models/workspace.model.js';
+import { attachRedisAdapter } from '../realtime/redisAdapter.js';
+import {
+  bus,
+  BOARD_EVENT,
+  USER_EVENT,
+  CHANNEL_EVENT,
+  WORKSPACE_EVENT,
+  type BoardEvent,
+  type UserEvent,
+  type ChannelEvent,
+  type WorkspaceEvent,
+} from '../realtime/bus.js';
 
 let io: Server | null = null;
 
@@ -25,11 +37,15 @@ function presenceList(boardId: string): SocketUser[] {
   return Array.from(presence.get(boardId)?.values() ?? []);
 }
 
-export function setupSockets(server: HttpServer): Server {
+export async function setupSockets(server: HttpServer): Promise<Server> {
   io = new Server(server, {
     cors: { origin: env.CORS_ORIGIN.split(',').map((s) => s.trim()), credentials: true },
     path: '/realtime',
   });
+
+  // Wire up cross-instance fan-out before any client connects (no-op fallback
+  // to the in-memory adapter when Redis isn't reachable).
+  await attachRedisAdapter(io);
 
   io.use((socket, next) => {
     try {
@@ -52,6 +68,34 @@ export function setupSockets(server: HttpServer): Server {
       return;
     }
     socket.join(`user:${user.id}`);
+
+    // Join the rooms for every org the user belongs to, so org-wide chat events
+    // (new public channels, unread bumps) reach them even when no channel is open.
+    void Workspace.find({
+      archived: false,
+      $or: [{ ownerId: user.id }, { 'members.userId': user.id }],
+    })
+      .select('_id')
+      .lean()
+      .then((wss) => wss.forEach((w) => socket.join(`org:${String(w._id)}`)))
+      .catch(() => undefined);
+
+    socket.on('channel.join', (channelId: string) => {
+      if (typeof channelId === 'string') socket.join(`channel:${channelId}`);
+    });
+
+    socket.on('channel.leave', (channelId: string) => {
+      if (typeof channelId === 'string') socket.leave(`channel:${channelId}`);
+    });
+
+    socket.on('channel.typing', (payload: { channelId?: string }) => {
+      if (!payload?.channelId) return;
+      socket.to(`channel:${payload.channelId}`).emit('channel.typing', {
+        channelId: payload.channelId,
+        userId: user.id,
+        userEmail: user.email,
+      });
+    });
 
     socket.on('board.join', (boardId: string) => {
       if (typeof boardId !== 'string') return;
@@ -96,6 +140,14 @@ export function setupSockets(server: HttpServer): Server {
 
   bus.on(USER_EVENT, (event: UserEvent) => {
     io?.to(`user:${event.userId}`).emit(event.type, event);
+  });
+
+  bus.on(CHANNEL_EVENT, (event: ChannelEvent) => {
+    io?.to(`channel:${event.channelId}`).emit(event.type, event);
+  });
+
+  bus.on(WORKSPACE_EVENT, (event: WorkspaceEvent) => {
+    io?.to(`org:${event.workspaceId}`).emit(event.type, event);
   });
 
   logger.info('socket.io listening at /realtime');

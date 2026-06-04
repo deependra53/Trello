@@ -17,6 +17,7 @@ export async function makeUser(app: Express, suffix = ''): Promise<TestUser> {
     email: `u${Date.now()}${counter}${suffix}@test.dev`,
     password: 'supersecret1',
     fullName: `User ${counter}`,
+    organizationName: `Org ${counter}`,
   };
   const res = await request(app).post('/api/auth/signup').send(u);
   if (res.status !== 201) throw new Error(`signup failed: ${res.status} ${JSON.stringify(res.body)}`);

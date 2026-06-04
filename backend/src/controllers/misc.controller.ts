@@ -1,11 +1,15 @@
 import type { Request, Response } from 'express';
 import * as searchSvc from '../services/search.service.js';
 import * as notifSvc from '../services/notification.service.js';
-import * as inboxSvc from '../services/inbox.service.js';
 import * as tmplSvc from '../services/template.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import type { AuthedRequest } from '../middleware/auth.middleware.js';
+import type { NotificationScope } from '../services/notification.service.js';
 import { Card } from '../models/card.model.js';
+
+function parseScope(v: unknown): NotificationScope | undefined {
+  return v === 'boards' || v === 'chat' ? v : undefined;
+}
 
 export const search = asyncHandler<AuthedRequest>(async (req, res) => {
   const q = (req.query.q as string) ?? '';
@@ -20,12 +24,14 @@ export const search = asyncHandler<AuthedRequest>(async (req, res) => {
 // Notifications
 export const notifications = asyncHandler<AuthedRequest>(async (req, res) => {
   const cursor = req.query.cursor as string | undefined;
-  const r = await notifSvc.list(req.user.sub, cursor);
+  const scope = parseScope(req.query.scope);
+  const r = await notifSvc.list(req.user.sub, { cursor, scope });
   res.json(r);
 });
 
 export const unreadCount = asyncHandler<AuthedRequest>(async (req, res) => {
-  res.json({ count: await notifSvc.unreadCount(req.user.sub) });
+  const scope = parseScope(req.query.scope);
+  res.json({ count: await notifSvc.unreadCount(req.user.sub, scope) });
 });
 
 export const markRead = asyncHandler<AuthedRequest>(async (req, res) => {
@@ -34,29 +40,8 @@ export const markRead = asyncHandler<AuthedRequest>(async (req, res) => {
 });
 
 export const markAllRead = asyncHandler<AuthedRequest>(async (req, res) => {
-  await notifSvc.markAllRead(req.user.sub);
-  res.status(204).end();
-});
-
-// Inbox
-export const inboxList = asyncHandler<AuthedRequest>(async (req, res) => {
-  res.json({ items: await inboxSvc.list(req.user.sub) });
-});
-
-export const inboxCapture = asyncHandler<AuthedRequest>(async (req, res) => {
-  const { title, body } = req.body as { title: string; body: string };
-  const item = await inboxSvc.capture(req.user.sub, title, body);
-  res.status(201).json(item);
-});
-
-export const inboxConvert = asyncHandler<AuthedRequest>(async (req, res) => {
-  const { listId } = req.body as { listId: string };
-  const card = await inboxSvc.convert(req.params.itemId as string, listId, req.user.sub);
-  res.status(201).json(card);
-});
-
-export const inboxDelete = asyncHandler<AuthedRequest>(async (req, res) => {
-  await inboxSvc.remove(req.params.itemId as string);
+  const scope = parseScope(req.query.scope);
+  await notifSvc.markAllRead(req.user.sub, scope);
   res.status(204).end();
 });
 

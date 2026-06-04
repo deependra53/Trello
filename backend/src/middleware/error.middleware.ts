@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import mongoose from 'mongoose';
+import { MulterError } from 'multer';
 import { AppError } from '../utils/errors.js';
 import { logger } from '../config/logger.js';
 
@@ -37,6 +38,19 @@ export function errorHandler(
 
   if (err instanceof mongoose.Error.CastError) {
     res.status(400).json({ error: { code: 'BAD_ID', message: 'Invalid identifier' } });
+    return;
+  }
+
+  // Multipart upload errors (e.g. file too large) — surface as a clear 4xx
+  // instead of a generic 500. Applies to avatar, card, and chat uploads.
+  if (err instanceof MulterError) {
+    const tooBig = err.code === 'LIMIT_FILE_SIZE';
+    res.status(tooBig ? 413 : 400).json({
+      error: {
+        code: tooBig ? 'FILE_TOO_LARGE' : 'UPLOAD_ERROR',
+        message: tooBig ? 'File is too large' : err.message,
+      },
+    });
     return;
   }
 

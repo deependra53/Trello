@@ -7,6 +7,16 @@ export const createCardSchema = z.object({
   position: z.number().optional(),
 });
 
+// Turn an existing chat message into a card. The destination list comes from the
+// route param; attachments are always derived server-side from the message. The
+// user may edit the title/description in the "Add as task" preview — when sent
+// they override the defaults (channel name / message body).
+export const createCardFromMessageSchema = z.object({
+  messageId: objectIdSchema,
+  title: z.string().min(1).max(500).trim().optional(),
+  description: z.string().max(20000).optional(),
+});
+
 export const updateCardSchema = z.object({
   title: z.string().min(1).max(500).trim().optional(),
   description: z.string().max(20000).optional(),

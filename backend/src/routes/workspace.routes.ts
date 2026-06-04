@@ -8,6 +8,8 @@ import {
   updateWorkspaceSchema,
   addMemberSchema,
   updateMemberSchema,
+  createInviteSchema,
+  acceptInviteSchema,
 } from '../validators/workspace.validator.js';
 import { createBoardSchema } from '../validators/board.validator.js';
 
@@ -16,6 +18,9 @@ router.use(requireAuth);
 
 router.get('/', ctrl.list);
 router.post('/', validate(createWorkspaceSchema), ctrl.create);
+
+// Any authenticated user can accept an invite they were sent (defined before /:id).
+router.post('/accept-invite', validate(acceptInviteSchema), ctrl.acceptInvite);
 
 router.get('/:id', requireWorkspaceRole('owner', 'admin', 'member', 'guest'), ctrl.get);
 router.patch(
@@ -26,6 +31,11 @@ router.patch(
 );
 router.delete('/:id', requireWorkspaceRole('owner'), ctrl.remove);
 
+router.get(
+  '/:id/members',
+  requireWorkspaceRole('owner', 'admin', 'member', 'guest'),
+  ctrl.listMembers,
+);
 router.post(
   '/:id/members',
   requireWorkspaceRole('owner', 'admin'),
@@ -39,6 +49,15 @@ router.patch(
   ctrl.updateMember,
 );
 router.delete('/:id/members/:userId', requireWorkspaceRole('owner', 'admin'), ctrl.removeMember);
+
+router.get('/:id/invites', requireWorkspaceRole('owner', 'admin'), ctrl.listInvites);
+router.post(
+  '/:id/invites',
+  requireWorkspaceRole('owner', 'admin'),
+  validate(createInviteSchema),
+  ctrl.createInvite,
+);
+router.delete('/:id/invites/:inviteId', requireWorkspaceRole('owner', 'admin'), ctrl.revokeInvite);
 
 router.get('/:id/boards', requireWorkspaceRole('owner', 'admin', 'member', 'guest'), ctrl.boards);
 router.post(

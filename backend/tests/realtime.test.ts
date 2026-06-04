@@ -30,6 +30,44 @@ describe('realtime bus', () => {
     }
   });
 
+  it('broadcasts the full comment to the board room when someone comments', async () => {
+    const user = await makeUser(app);
+    const ws = await makeWorkspace(app, user);
+    const board = await makeBoard(app, user, ws._id);
+    const list = await makeList(app, user, board._id);
+    const cardRes = await request(app)
+      .post(`/api/lists/${list._id}/cards`)
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ title: 'Card' });
+    const card = cardRes.body;
+
+    const events: Array<{ boardId: string; type: string; actorId?: string; payload?: Record<string, unknown> }> = [];
+    const handler = (e: unknown) => events.push(e as (typeof events)[number]);
+    bus.on(BOARD_EVENT, handler);
+    try {
+      await request(app)
+        .post(`/api/cards/${card._id}/comments`)
+        .set('Authorization', `Bearer ${user.token}`)
+        .send({ body: 'live comment', mentions: [] })
+        .expect(201);
+      await new Promise((r) => setTimeout(r, 50));
+
+      const evt = events.find((e) => e.type === 'card.comment.created');
+      expect(evt).toBeDefined();
+      expect(evt?.boardId).toBe(board._id);
+      expect(evt?.actorId).toBe(user.id);
+      const payload = evt?.payload as
+        | { cardId: string; comment: { _id: string; body: string }; author?: { fullName: string } }
+        | undefined;
+      expect(payload?.cardId).toBe(card._id);
+      expect(payload?.comment?.body).toBe('live comment');
+      expect(payload?.comment?._id).toBeTruthy();
+      expect(payload?.author?.fullName).toBe(user.fullName);
+    } finally {
+      bus.off(BOARD_EVENT, handler);
+    }
+  });
+
   it('emits user notification when commenter mentions a watcher', async () => {
     const author = await makeUser(app);
     const watcher = await makeUser(app);

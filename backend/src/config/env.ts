@@ -16,7 +16,9 @@ const schema = z.object({
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),
-  MAIL_FROM: z.string().default('TrelloX <no-reply@trellox.app>'),
+  // Leave blank to auto-derive from SMTP_USER (see email.service) — guarantees the
+  // From address matches the authenticated account, which Gmail requires.
+  MAIL_FROM: z.string().default(''),
   APP_URL: z.string().default('http://localhost:3000'),
   UPLOAD_PROVIDER: z.enum(['cloudinary', 's3', 'local']).default('local'),
   CLOUDINARY_CLOUD_NAME: z.string().optional().default(''),
@@ -30,6 +32,11 @@ const schema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().default(200),
   LOG_LEVEL: z.string().default('info'),
 });
+
+// Accept SMTP_PASSWORD as an alias for SMTP_PASS (both spellings are common).
+if (!process.env.SMTP_PASS && process.env.SMTP_PASSWORD) {
+  process.env.SMTP_PASS = process.env.SMTP_PASSWORD;
+}
 
 const parsed = schema.safeParse(process.env);
 if (!parsed.success) {

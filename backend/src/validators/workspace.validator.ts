@@ -31,3 +31,12 @@ export const addMemberSchema = z.object({
 export const updateMemberSchema = z.object({
   role: z.enum(['owner', 'admin', 'member', 'guest']),
 });
+
+export const createInviteSchema = z.object({
+  email: z.string().email().toLowerCase().trim(),
+  role: z.enum(['admin', 'member', 'guest']).default('member'),
+});
+
+export const acceptInviteSchema = z.object({
+  token: z.string().min(8),
+});
