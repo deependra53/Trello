@@ -1,4 +1,4 @@
-# Trello
+# IndiHive
 
 ## Performance rules
 

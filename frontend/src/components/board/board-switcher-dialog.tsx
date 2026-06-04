@@ -2,13 +2,20 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueries } from '@tanstack/react-query';
-import { ChevronDown, Clock, Search } from 'lucide-react';
+import { Check, ChevronDown, LayoutList, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useWorkspaces } from '@/hooks/use-boards';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import type { Board, Workspace } from '@/types/api';
+import { bgStyleOf, iconForTitle, shortAgo } from '@/lib/board-visuals';
+import type { Board } from '@/types/api';
 
 interface Props {
   open: boolean;
@@ -16,12 +23,25 @@ interface Props {
   currentBoardId?: string;
 }
 
+interface BoardEntry {
+  board: Board;
+  workspaceName: string;
+}
+
+type SortKey = 'recent' | 'alpha' | 'tasks';
+const SORT_LABELS: Record<SortKey, string> = {
+  recent: 'Recent',
+  alpha: 'Alphabetical',
+  tasks: 'Most tasks',
+};
+
+const RECENT_LIMIT = 8;
+
 export function BoardSwitcherDialog({ open, onOpenChange, currentBoardId }: Props) {
   const router = useRouter();
-  const { data: workspaces } = useWorkspaces();
+  const { data: workspaces, isLoading: wsLoading } = useWorkspaces();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | string>('all');
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<SortKey>('recent');
 
   const wsQueries = useQueries({
     queries: (workspaces ?? []).map((ws) => ({
@@ -32,154 +52,138 @@ export function BoardSwitcherDialog({ open, onOpenChange, currentBoardId }: Prop
     })),
   });
 
-  const boardsByWs = useMemo(() => {
-    const map = new Map<string, Board[]>();
+  const isLoading = wsLoading || wsQueries.some((wq) => wq.isLoading);
+
+  const allBoards = useMemo<BoardEntry[]>(() => {
+    const list: BoardEntry[] = [];
     (workspaces ?? []).forEach((ws, i) => {
-      map.set(ws._id, wsQueries[i]?.data ?? []);
+      (wsQueries[i]?.data ?? []).forEach((board) => list.push({ board, workspaceName: ws.name }));
     });
-    return map;
+    return list;
   }, [workspaces, wsQueries]);
 
   const q = query.trim().toLowerCase();
-  const matches = (b: Board) => !q || b.title.toLowerCase().includes(q);
-
-  const recent = useMemo(() => {
-    const list: { board: Board; workspace: Workspace }[] = [];
-    (workspaces ?? []).forEach((ws) => {
-      if (filter !== 'all' && filter !== ws._id) return;
-      (boardsByWs.get(ws._id) ?? []).forEach((board) => {
-        if (matches(board)) list.push({ board, workspace: ws });
-      });
-    });
-    return list
-      .sort(
-        (a, b) =>
-          +new Date(b.board.lastActivityAt || 0) - +new Date(a.board.lastActivityAt || 0),
-      )
-      .slice(0, 8);
-  }, [workspaces, boardsByWs, filter, q]);
-
-  const totalBoards = useMemo(
-    () => Array.from(boardsByWs.values()).reduce((sum, list) => sum + list.length, 0),
-    [boardsByWs],
+  const filtered = useMemo(
+    () =>
+      allBoards.filter(
+        (e) =>
+          !q ||
+          e.board.title.toLowerCase().includes(q) ||
+          e.workspaceName.toLowerCase().includes(q),
+      ),
+    [allBoards, q],
   );
-  const isLoading = wsQueries.some((wq) => wq.isLoading);
+
+  const byRecency = (a: BoardEntry, b: BoardEntry) =>
+    +new Date(b.board.lastActivityAt || 0) - +new Date(a.board.lastActivityAt || 0);
+
+  const recent = useMemo(
+    () => [...filtered].sort(byRecency).slice(0, RECENT_LIMIT),
+    [filtered],
+  );
+
+  const sorted = useMemo(() => {
+    const items = [...filtered];
+    items.sort((a, b) => {
+      if (sort === 'alpha') return a.board.title.localeCompare(b.board.title);
+      if (sort === 'tasks') return (b.board.cardCount ?? 0) - (a.board.cardCount ?? 0);
+      return byRecency(a, b);
+    });
+    return items;
+  }, [filtered, sort]);
+
+  // Recent is a quick-access strip shown only on the default (non-search) view;
+  // "All boards" then lists the rest so cards never appear twice.
+  const showRecent = !q && recent.length > 0;
+  const recentIds = useMemo(
+    () => new Set(showRecent ? recent.map((e) => e.board._id) : []),
+    [showRecent, recent],
+  );
+  const allList = useMemo(
+    () => sorted.filter((e) => !recentIds.has(e.board._id)),
+    [sorted, recentIds],
+  );
 
   function openBoard(id: string) {
     onOpenChange(false);
     router.push(`/boards/${id}`);
   }
 
-  function toggleCollapsed(id: string) {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl gap-0 p-5 sm:rounded-2xl">
-        <DialogTitle className="sr-only">Switch boards</DialogTitle>
-
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            autoFocus
-            placeholder="Search your boards"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-11 pl-9"
-          />
+      <DialogContent className="max-w-4xl gap-0 overflow-hidden p-0 sm:rounded-2xl">
+        {/* Header: title + subtitle on the left, search on the right */}
+        <div className="flex flex-col gap-4 border-b border-border/60 p-5 pr-12 sm:flex-row sm:items-center sm:gap-6 sm:p-6 sm:pr-16">
+          <div className="min-w-0">
+            <DialogTitle className="text-xl font-bold tracking-tight">Switch board</DialogTitle>
+            <p className="mt-0.5 text-sm text-muted-foreground">Select a board to switch to</p>
+          </div>
+          <div className="relative sm:ml-auto sm:w-[22rem]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              autoFocus
+              placeholder="Search boards..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-11 pl-9 pr-12"
+            />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 select-none items-center rounded-md border border-border/70 bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:flex">
+              ⌘K
+            </kbd>
+          </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
-            All
-          </FilterChip>
-          {(workspaces ?? []).map((ws) => (
-            <FilterChip
-              key={ws._id}
-              active={filter === ws._id}
-              onClick={() => setFilter(ws._id)}
-            >
-              {ws.name}
-            </FilterChip>
-          ))}
-        </div>
-
-        <div className="mt-4 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin">
-          {recent.length > 0 && (
-            <section>
-              <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                Recent
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {recent.map(({ board }) => (
-                  <BoardTile
-                    key={board._id}
-                    board={board}
-                    isCurrent={board._id === currentBoardId}
-                    onSelect={() => openBoard(board._id)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {(workspaces ?? []).map((ws) => {
-            if (filter !== 'all' && filter !== ws._id) return null;
-            const list = (boardsByWs.get(ws._id) ?? []).filter(matches);
-            if (!list.length) return null;
-            const isCollapsed = collapsed.has(ws._id);
-            return (
-              <section key={ws._id} className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => toggleCollapsed(ws._id)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-foreground/70"
-                >
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 transition-transform',
-                      isCollapsed && '-rotate-90',
-                    )}
-                  />
-                  {ws.name}
-                </button>
-                {!isCollapsed && (
-                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {list.map((board) => (
-                      <BoardTile
-                        key={board._id}
-                        board={board}
-                        isCurrent={board._id === currentBoardId}
-                        onSelect={() => openBoard(board._id)}
+        {/* Body */}
+        <div className="max-h-[64vh] overflow-y-auto p-5 scrollbar-thin sm:p-6">
+          {isLoading ? (
+            <LoadingSection />
+          ) : allBoards.length === 0 ? (
+            <EmptyState
+              title="No boards yet"
+              subtitle="Create a board and it will show up here."
+            />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title={`No boards match “${query}”`}
+              subtitle="Try a different search term."
+            />
+          ) : (
+            <>
+              {showRecent && (
+                <section className={cn(allList.length > 0 && 'mb-7')}>
+                  <SectionLabel>Recent</SectionLabel>
+                  <CardGrid>
+                    {recent.map((e) => (
+                      <BoardCard
+                        key={e.board._id}
+                        entry={e}
+                        isCurrent={e.board._id === currentBoardId}
+                        onSelect={() => openBoard(e.board._id)}
                       />
                     ))}
-                  </div>
-                )}
-              </section>
-            );
-          })}
+                  </CardGrid>
+                </section>
+              )}
 
-          {!isLoading && totalBoards === 0 && (
-            <div className="grid place-items-center py-12 text-sm text-muted-foreground">
-              No boards yet
-            </div>
-          )}
-          {isLoading && totalBoards === 0 && (
-            <div className="grid place-items-center py-12 text-sm text-muted-foreground">
-              Loading boards…
-            </div>
-          )}
-          {!isLoading && totalBoards > 0 && recent.length === 0 && q && (
-            <div className="grid place-items-center py-12 text-sm text-muted-foreground">
-              No boards match “{query}”
-            </div>
+              {allList.length > 0 && (
+                <section>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <SectionLabel className="mb-0">All boards</SectionLabel>
+                    <SortMenu value={sort} onChange={setSort} />
+                  </div>
+                  <CardGrid>
+                    {allList.map((e) => (
+                      <BoardCard
+                        key={e.board._id}
+                        entry={e}
+                        isCurrent={e.board._id === currentBoardId}
+                        onSelect={() => openBoard(e.board._id)}
+                      />
+                    ))}
+                  </CardGrid>
+                </section>
+              )}
+            </>
           )}
         </div>
       </DialogContent>
@@ -187,61 +191,133 @@ export function BoardSwitcherDialog({ open, onOpenChange, currentBoardId }: Prop
   );
 }
 
-function FilterChip({
-  active,
-  onClick,
+function SectionLabel({
   children,
+  className,
 }: {
-  active: boolean;
-  onClick: () => void;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
       className={cn(
-        'rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-        active
-          ? 'border-primary bg-primary/10 text-primary'
-          : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+        'mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground',
+        className,
       )}
     >
       {children}
-    </button>
+    </div>
   );
 }
 
-function BoardTile({
-  board,
+function CardGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{children}</div>
+  );
+}
+
+function SortMenu({ value, onChange }: { value: SortKey; onChange: (v: SortKey) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          Sort by: <span className="text-foreground">{SORT_LABELS[value]}</span>
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[10rem]">
+        {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+          <DropdownMenuItem key={k} onClick={() => onChange(k)}>
+            <Check
+              className={cn('h-3.5 w-3.5 text-primary', k === value ? 'opacity-100' : 'opacity-0')}
+            />
+            {SORT_LABELS[k]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function BoardCard({
+  entry,
   isCurrent,
   onSelect,
 }: {
-  board: Board;
+  entry: BoardEntry;
   isCurrent: boolean;
   onSelect: () => void;
 }) {
-  const bgStyle =
-    board.background?.type === 'gradient'
-      ? { backgroundImage: board.background.value }
-      : { backgroundColor: board.background?.value ?? '#795DFF' };
+  const { board, workspaceName } = entry;
+  const Icon = iconForTitle(board.title);
+  const count = board.cardCount ?? 0;
 
   return (
     <button
       type="button"
       onClick={onSelect}
+      aria-current={isCurrent ? 'true' : undefined}
       className={cn(
-        'group relative aspect-[16/9] overflow-hidden rounded-lg text-left shadow-sm transition hover:scale-[1.02] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-        isCurrent && 'ring-2 ring-primary ring-offset-2',
+        'group relative flex flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        isCurrent ? 'border-primary/60 ring-1 ring-primary/40' : 'border-border/60',
       )}
-      style={bgStyle}
     >
-      <div className="absolute inset-0 bg-gradient-to-tr from-black/45 via-black/10 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 p-2.5">
-        <span className="line-clamp-2 text-xs font-semibold text-white drop-shadow">
-          {board.title}
+      {isCurrent && (
+        <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
+          <Check className="h-3 w-3" strokeWidth={3} />
         </span>
+      )}
+
+      <div className="flex items-start gap-3">
+        <span
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-sm"
+          style={bgStyleOf(board.background)}
+        >
+          <Icon className="h-[1.35rem] w-[1.35rem] drop-shadow-sm" />
+        </span>
+        <div className={cn('min-w-0 flex-1 pt-0.5', isCurrent && 'pr-5')}>
+          <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">
+            {board.title}
+          </h3>
+          <p className="truncate text-xs text-muted-foreground">{workspaceName}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <LayoutList className="h-3.5 w-3.5" />
+          {count} {count === 1 ? 'task' : 'tasks'}
+        </span>
+        <span>{shortAgo(board.lastActivityAt)}</span>
       </div>
     </button>
+  );
+}
+
+function LoadingSection() {
+  return (
+    <section>
+      <div className="skeleton mb-3 h-3 w-16 rounded" />
+      <CardGrid>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="skeleton h-[6.25rem] rounded-2xl" />
+        ))}
+      </CardGrid>
+    </section>
+  );
+}
+
+function EmptyState({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="grid place-items-center gap-3 py-16 text-center">
+      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+        <Search className="h-5 w-5" />
+      </div>
+      <div className="text-sm font-medium">{title}</div>
+      <div className="text-xs text-muted-foreground">{subtitle}</div>
+    </div>
   );
 }

@@ -7,6 +7,7 @@ import type { Card, Label } from '@/types/api';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUpdateCard } from '@/hooks/use-cards';
 import { useUIStore } from '@/stores/ui';
+import { useActivityStore } from '@/stores/activity';
 
 interface Props {
   card: Card;
@@ -19,9 +20,9 @@ function dueColor(dueDate?: string, dueComplete?: boolean) {
   if (!dueDate) return null;
   const d = new Date(dueDate);
   const now = new Date();
-  if (dueComplete) return 'bg-green-100 text-green-800';
-  if (d < now) return 'bg-red-100 text-red-800';
-  if (d.getTime() - now.getTime() < 24 * 3600 * 1000) return 'bg-yellow-100 text-yellow-800';
+  if (dueComplete) return 'bg-success/15 text-success';
+  if (d < now) return 'bg-destructive/15 text-destructive';
+  if (d.getTime() - now.getTime() < 24 * 3600 * 1000) return 'bg-warning/15 text-warning';
   return 'bg-muted text-muted-foreground';
 }
 
@@ -29,6 +30,7 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
   const updateCard = useUpdateCard(card.boardId);
   const labelsExpanded = useUIStore((s) => s.labelsExpanded);
   const toggleLabelsExpanded = useUIStore((s) => s.toggleLabelsExpanded);
+  const flashing = useActivityStore((s) => !!s.flashing[card._id]);
   const [bouncing, setBouncing] = useState(false);
   const cardLabels = labels?.filter((l) => card.labels?.includes(l._id)) ?? [];
   const checklistTotal = (card.checklists ?? []).reduce((a, c) => a + (c.items?.length ?? 0), 0);
@@ -67,8 +69,11 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
         }
       }}
       className={cn(
-        'group relative w-full overflow-hidden rounded-lg bg-card text-left shadow-soft transition-shadow duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary',
-        isDragging && 'rotate-2 ring-2 ring-primary/60 shadow-glow',
+        'group relative w-full overflow-hidden rounded-lg border border-border/60 bg-card text-left shadow-xs transition-all duration-200 hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0',
+        isDragging && 'rotate-2 border-primary/60 shadow-glow ring-2 ring-primary/60',
+        // Transient highlight when realtime activity (e.g. a new comment) lands
+        // on this card while it isn't open — rolls back via `transition-all`.
+        flashing && !isDragging && 'border-primary/70 bg-primary/5 shadow-glow ring-2 ring-primary/70',
       )}
     >
       {coverColor && <div className="h-8" style={{ backgroundColor: coverColor }} />}
@@ -134,9 +139,9 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
               onAnimationEnd={() => setBouncing(false)}
             >
               {card.dueComplete ? (
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                <CheckCircle2 className="h-5 w-5 text-success" />
               ) : (
-                <Circle className="h-5 w-5 text-muted-foreground" strokeWidth={2} />
+                <Circle className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" strokeWidth={2} />
               )}
             </span>
           </button>
@@ -163,7 +168,12 @@ export function CardTile({ card, labels, onOpen, isDragging }: Props) {
               </span>
             )}
             {card.dueDate && (
-              <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5', dueCls)}>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium',
+                  dueCls,
+                )}
+              >
                 <Clock className="h-3 w-3" />
                 {formatDistanceToNowStrict(new Date(card.dueDate), { addSuffix: true })}
               </span>

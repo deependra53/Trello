@@ -22,7 +22,7 @@ export function AddListForm({ boardId }: { boardId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-12 w-72 shrink-0 items-center justify-center gap-2 rounded-xl bg-white/20 px-3 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30"
+        className="flex h-12 w-72 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/15 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-0"
       >
         <Plus className="h-4 w-4" />
         Add another list
@@ -33,7 +33,7 @@ export function AddListForm({ boardId }: { boardId: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="w-72 shrink-0 space-y-2 rounded-xl bg-muted/95 p-2 shadow-soft"
+      className="w-72 shrink-0 animate-scale-in space-y-2 rounded-xl border border-border/60 bg-muted p-2 shadow-md"
     >
       <Input
         autoFocus

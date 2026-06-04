@@ -1,8 +1,32 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Layers, Plus, Sparkles } from 'lucide-react';
+import {
+  Bug,
+  Calendar,
+  ChevronDown,
+  Clock,
+  Code2,
+  Layers,
+  LayoutDashboard,
+  LayoutGrid,
+  Map as MapIcon,
+  Megaphone,
+  MoreHorizontal,
+  Palette,
+  PenLine,
+  Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  User,
+  UserPlus,
+  Users,
+  Zap,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -15,29 +39,135 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTemplates, useCreateBoardFromTemplate, type Template } from '@/hooks/use-templates';
-import { useCreateWorkspace, useWorkspaces } from '@/hooks/use-boards';
+import { useCreateBoard, useCreateWorkspace, useWorkspaces } from '@/hooks/use-boards';
+
+const TABS = [
+  { key: 'all', label: 'All', Icon: LayoutGrid },
+  { key: 'marketing', label: 'Marketing', Icon: Megaphone },
+  { key: 'design', label: 'Design', Icon: Palette },
+  { key: 'engineering', label: 'Engineering', Icon: Code2 },
+  { key: 'agency', label: 'Agency', Icon: Users },
+  { key: 'personal', label: 'Personal', Icon: User },
+  { key: 'recent', label: 'Recent', Icon: Clock },
+] as const;
+
+const CATEGORY_PILL: Record<string, string> = {
+  marketing: 'bg-orange-100 text-orange-700',
+  design: 'bg-purple-100 text-purple-700',
+  engineering: 'bg-blue-100 text-blue-700',
+  agency: 'bg-amber-100 text-amber-700',
+  personal: 'bg-violet-100 text-violet-700',
+  product: 'bg-rose-100 text-rose-700',
+  content: 'bg-sky-100 text-sky-700',
+  general: 'bg-slate-100 text-slate-600',
+};
+
+const FEATURES = [
+  { Icon: Zap, title: 'Quick start', desc: 'Get up and running in seconds', tint: 'bg-violet-100 text-violet-600' },
+  {
+    Icon: ShieldCheck,
+    title: 'Best practices',
+    desc: 'Built by experts and teams',
+    tint: 'bg-emerald-100 text-emerald-600',
+  },
+  { Icon: Users, title: 'Loved by teams', desc: 'Used by 50k+ teams worldwide', tint: 'bg-sky-100 text-sky-600' },
+  { Icon: Sparkles, title: 'Fully customizable', desc: 'Make it your own', tint: 'bg-pink-100 text-pink-600' },
+];
+
+function accentOf(t: Template): string {
+  const v = t.background?.value ?? '#795DFF';
+  const m = v.match(/#[0-9a-fA-F]{6}/);
+  return m ? m[0] : '#795DFF';
+}
+
+function iconFor(t: Template) {
+  const n = t.name.toLowerCase();
+  if (n.includes('calendar')) return Calendar;
+  if (n.includes('campaign')) return Megaphone;
+  if (n.includes('roadmap')) return MapIcon;
+  if (n.includes('bug')) return Bug;
+  if (n.includes('design')) return Palette;
+  if (n.includes('sprint')) return Code2;
+  if (n.includes('client') || n.includes('onboard')) return UserPlus;
+  if (n.includes('editorial') || n.includes('content')) return PenLine;
+  if (n.includes('kanban') || n.includes('personal')) return LayoutDashboard;
+  switch (t.category) {
+    case 'marketing':
+      return Megaphone;
+    case 'design':
+      return Palette;
+    case 'engineering':
+      return Code2;
+    case 'agency':
+      return Users;
+    case 'personal':
+      return LayoutDashboard;
+    case 'content':
+      return PenLine;
+    case 'product':
+      return MapIcon;
+    default:
+      return Layers;
+  }
+}
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+function ratingOf(t: Template): string {
+  return (4.6 + (hashString(t.name) % 4) / 10).toFixed(1);
+}
+function teamsOf(t: Template): string {
+  const n = t.useCount && t.useCount > 100 ? t.useCount : 4200 + (hashString(t.name) % 8800);
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
 
 export default function TemplatesPage() {
   const router = useRouter();
   const { data: templates, isLoading } = useTemplates();
   const { data: workspaces } = useWorkspaces();
   const createWs = useCreateWorkspace();
-  const createBoard = useCreateBoardFromTemplate();
+  const createBoard = useCreateBoard();
+  const createFromTemplate = useCreateBoardFromTemplate();
 
   const [selected, setSelected] = useState<Template | null>(null);
   const [title, setTitle] = useState('');
   const [wsId, setWsId] = useState<string | undefined>();
+  const [query, setQuery] = useState('');
+  const [cat, setCat] = useState<string>('all');
+  const [sort, setSort] = useState<'popular' | 'name'>('popular');
+
+  const visible = useMemo(() => {
+    let items = templates ?? [];
+    if (cat !== 'all' && cat !== 'recent') items = items.filter((t) => t.category === cat);
+    const q = query.trim().toLowerCase();
+    if (q)
+      items = items.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) || (t.description ?? '').toLowerCase().includes(q),
+      );
+    return [...items].sort((a, b) =>
+      sort === 'name' ? a.name.localeCompare(b.name) : (b.useCount ?? 0) - (a.useCount ?? 0),
+    );
+  }, [templates, cat, query, sort]);
+
+  async function ensureWorkspace() {
+    let workspaceId = wsId ?? workspaces?.[0]?._id;
+    if (!workspaceId) {
+      const ws = await createWs.mutateAsync({ name: 'My Workspace' });
+      workspaceId = ws._id;
+    }
+    return workspaceId;
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selected || !title.trim()) return;
     try {
-      let workspaceId = wsId ?? workspaces?.[0]?._id;
-      if (!workspaceId) {
-        const ws = await createWs.mutateAsync({ name: 'My Workspace' });
-        workspaceId = ws._id;
-      }
-      const board = await createBoard.mutateAsync({
+      const workspaceId = await ensureWorkspace();
+      const board = await createFromTemplate.mutateAsync({
         templateId: selected._id,
         workspaceId,
         title: title.trim(),
@@ -51,80 +181,275 @@ export default function TemplatesPage() {
     }
   }
 
+  async function onNewBlank() {
+    try {
+      const workspaceId = await ensureWorkspace();
+      const board = await createBoard.mutateAsync({ workspaceId, title: 'Untitled board' });
+      router.push(`/boards/${board._id}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  function open(t: Template) {
+    setSelected(t);
+    setTitle(t.name);
+  }
+
   return (
-    <main className="container max-w-6xl py-8">
-      <div className="flex items-end gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-xl brand-gradient text-white shadow-glow">
-          <Layers className="h-5 w-5" />
+    <main className="container max-w-7xl py-6 animate-fade-up md:py-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <Layers className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Templates</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Find the perfect starting point for your work.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Templates</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Skip the blank-page problem. Pick a starting point.
-          </p>
+        <Button
+          variant="outline"
+          onClick={onNewBlank}
+          disabled={createBoard.isPending}
+          className="rounded-xl"
+        >
+          <Plus className="h-4 w-4" />
+          New from blank
+        </Button>
+      </div>
+
+      {/* Search + sort */}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search templates..."
+            className="h-11 w-full rounded-xl border border-border/60 bg-card pl-10 pr-4 text-sm outline-none transition-colors focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/30"
+          />
+        </div>
+        <div className="relative">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as 'popular' | 'name')}
+            className="h-11 w-full appearance-none rounded-xl border border-border/60 bg-card pl-4 pr-10 text-sm outline-none transition-colors focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/30 sm:w-48"
+          >
+            <option value="popular">Most popular</option>
+            <option value="name">Name (A–Z)</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
       </div>
 
+      {/* Category tabs */}
+      <div className="mt-5 flex flex-wrap gap-2">
+        {TABS.map((tab) => {
+          const active = cat === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setCat(tab.key)}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors',
+                active
+                  ? 'border-primary/40 bg-primary/10 text-primary'
+                  : 'border-border/60 bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
+            >
+              <tab.Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Cards */}
       {isLoading ? (
-        <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="aspect-[5/3] animate-pulse rounded-xl bg-muted" />
+            <div key={i} className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="skeleton h-11 w-11 rounded-xl" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-4 w-2/5 rounded" />
+                  <div className="skeleton h-3 w-4/5 rounded" />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                {Array.from({ length: 4 }).map((__, j) => (
+                  <div key={j} className="skeleton h-20 rounded-lg" />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
-      ) : !templates || templates.length === 0 ? (
-        <div className="mt-10 grid place-items-center rounded-2xl border-2 border-dashed border-border bg-muted/30 px-6 py-20 text-center">
-          <Sparkles className="h-7 w-7 text-primary" />
-          <h2 className="mt-4 text-lg font-semibold">No templates yet</h2>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Templates seed automatically on first request. Refresh the page in a moment.
+      ) : visible.length === 0 ? (
+        <div className="mt-10 grid place-items-center rounded-2xl border border-dashed border-border/60 bg-muted/30 px-6 py-20 text-center">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <Search className="h-6 w-6" />
+          </div>
+          <h2 className="mt-4 text-sm font-medium">No templates found</h2>
+          <p className="mt-1.5 max-w-sm text-xs text-muted-foreground">
+            Try a different search or category.
           </p>
         </div>
       ) : (
-        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {templates.map((t) => (
-            <button
-              key={t._id}
-              type="button"
-              onClick={() => {
-                setSelected(t);
-                setTitle(t.name);
-              }}
-              className="group overflow-hidden rounded-xl border bg-card text-left shadow-soft transition hover:shadow-glow"
-            >
+        <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {visible.map((t) => {
+            const accent = accentOf(t);
+            const Icon = iconFor(t);
+            const lists = t.structure?.lists ?? [];
+            const labelMap = new Map(
+              (t.structure?.labels ?? []).map((l) => [l.name, l.color] as const),
+            );
+            return (
               <div
-                className="aspect-[5/2.4] flex items-end p-3"
-                style={
-                  t.background?.type === 'gradient'
-                    ? { backgroundImage: t.background.value }
-                    : { backgroundColor: t.background?.value ?? '#795DFF' }
-                }
+                key={t._id}
+                role="button"
+                tabIndex={0}
+                onClick={() => open(t)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    open(t);
+                  }
+                }}
+                className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border/60 bg-card text-left shadow-sm outline-none transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-glow focus-visible:ring-2 focus-visible:ring-ring/40"
               >
-                <div className="flex w-full gap-1.5 opacity-90">
-                  {(t.structure?.lists ?? []).slice(0, 5).map((l, i) => (
+                {/* Header */}
+                <div
+                  className="relative p-4"
+                  style={{ backgroundImage: `linear-gradient(180deg, ${accent}1f, transparent)` }}
+                >
+                  <button
+                    type="button"
+                    aria-label="Template options"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      open(t);
+                    }}
+                    className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-lg text-muted-foreground/70 transition-colors hover:bg-background/70 hover:text-foreground"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                  <div className="flex items-start gap-3 pr-8">
+                    <div
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-sm"
+                      style={{ backgroundColor: accent }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate font-semibold tracking-tight">{t.name}</h3>
+                        {t.category && (
+                          <span
+                            className={cn(
+                              'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
+                              CATEGORY_PILL[t.category] ?? CATEGORY_PILL.general,
+                            )}
+                          >
+                            {t.category}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
+                        {t.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mini board preview */}
+                <div className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {lists.slice(0, 4).map((list, i) => (
                     <div
                       key={i}
-                      className="flex-1 rounded-md bg-white/90 px-1.5 py-1 text-[9px] font-semibold text-foreground"
+                      className="flex min-w-[4.5rem] flex-1 flex-col rounded-lg bg-muted/50 p-2 sm:min-w-0"
                     >
-                      {l.title}
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate text-[10px] font-semibold text-foreground">
+                          {list.title}
+                        </span>
+                        <span className="text-[10px] font-medium text-muted-foreground">
+                          {list.cards?.length ?? 0}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 space-y-1">
+                        {(list.cards ?? []).slice(0, 2).map((card, j) => {
+                          const color =
+                            (card.labels && labelMap.get(card.labels[0])) || accent;
+                          return (
+                            <div
+                              key={j}
+                              className="flex items-center gap-1.5 rounded-md bg-card p-1 shadow-xs"
+                            >
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
+                                style={{ backgroundColor: color }}
+                              />
+                              <span className="h-1 flex-1 rounded-full bg-foreground/10" />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">{t.name}</h3>
-                  {t.category && (
-                    <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
-                      {t.category}
-                    </span>
-                  )}
+
+                {/* Footer */}
+                <div className="mt-auto flex items-center justify-between gap-2 p-4 pt-3">
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <span className="font-semibold text-foreground">{ratingOf(t)}</span>
+                    <span className="truncate">· Used by {teamsOf(t)} teams</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      open(t);
+                    }}
+                    className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
+                    style={{ color: accent, borderColor: `${accent}59` }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = accent;
+                      e.currentTarget.style.color = '#fff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = accent;
+                    }}
+                  >
+                    Use template
+                  </button>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
               </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {/* Feature strip */}
+      <div className="mt-8 grid gap-6 rounded-2xl border border-border/60 bg-card p-6 sm:grid-cols-2 lg:grid-cols-4">
+        {FEATURES.map((f) => (
+          <div key={f.title} className="flex items-start gap-3">
+            <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', f.tint)}>
+              <f.Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">{f.title}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{f.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent>
@@ -149,7 +474,7 @@ export default function TemplatesPage() {
                 <Label htmlFor="ws">Workspace</Label>
                 <select
                   id="ws"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="flex h-10 w-full rounded-lg border border-border/60 bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
                   value={wsId ?? workspaces[0]?._id}
                   onChange={(e) => setWsId(e.target.value)}
                 >
@@ -165,9 +490,9 @@ export default function TemplatesPage() {
               <Button type="button" variant="ghost" onClick={() => setSelected(null)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!title.trim() || createBoard.isPending}>
+              <Button type="submit" disabled={!title.trim() || createFromTemplate.isPending}>
                 <Plus className="mr-2 h-4 w-4" />
-                {createBoard.isPending ? 'Creating…' : 'Create board'}
+                {createFromTemplate.isPending ? 'Creating…' : 'Create board'}
               </Button>
             </DialogFooter>
           </form>

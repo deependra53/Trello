@@ -78,15 +78,16 @@ export function CalendarView({ board, onOpenCard }: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-3 shadow-soft">
-        <h3 className="text-base font-semibold">{format(cursor, 'MMMM yyyy')}</h3>
+    <div className="flex h-full flex-col gap-3 p-4 pb-24 animate-fade-up lg:pb-4">
+      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-3 shadow-sm">
+        <h3 className="text-base font-bold tracking-tight">{format(cursor, 'MMMM yyyy')}</h3>
         <div className="ml-auto flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCursor(subMonths(cursor, 1))}
             aria-label="Previous month"
+            className="h-8 w-8 rounded-lg"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -98,16 +99,18 @@ export function CalendarView({ board, onOpenCard }: Props) {
             size="icon"
             onClick={() => setCursor(addMonths(cursor, 1))}
             aria-label="Next month"
+            className="h-8 w-8 rounded-lg"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-xl border border-border/60 bg-card shadow-soft">
-        <div className="grid grid-cols-7 border-b border-border/60 text-xs font-semibold text-muted-foreground">
+      <div className="flex-1 overflow-auto rounded-xl border border-border/60 bg-card shadow-sm scrollbar-thin lg:overflow-hidden">
+        <div className="flex h-full min-w-[44rem] flex-col lg:min-w-0">
+        <div className="grid grid-cols-7 border-b border-border/60 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <div key={d} className="px-2 py-2 text-center">
+            <div key={d} className="px-2 py-2.5 text-center">
               {d}
             </div>
           ))}
@@ -158,8 +161,8 @@ export function CalendarView({ board, onOpenCard }: Props) {
                                 {...p.dragHandleProps}
                                 onClick={() => onOpenCard(c._id)}
                                 className={cn(
-                                  'w-full rounded-md border border-border/60 bg-muted px-1.5 py-1 text-left text-[11px] transition hover:bg-accent/40',
-                                  snap.isDragging && 'rotate-1 ring-2 ring-primary',
+                                  'w-full rounded-lg border border-border/60 bg-card px-1.5 py-1 text-left text-[11px] shadow-xs transition-all duration-150 hover:border-primary/40 hover:bg-muted',
+                                  snap.isDragging && 'rotate-1 shadow-md ring-2 ring-primary',
                                 )}
                               >
                                 {cardLabels.length > 0 && (
@@ -187,6 +190,7 @@ export function CalendarView({ board, onOpenCard }: Props) {
             })}
           </div>
         </DragDropContext>
+        </div>
       </div>
     </div>
   );

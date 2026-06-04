@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from './theme-toggle';
 import { NotificationsDropdown } from './notifications-dropdown';
+import { WorkspaceToggle } from './workspace-toggle';
 import { useAuthStore } from '@/stores/auth';
 import { useUIStore } from '@/stores/ui';
 import { getInitials } from '@/lib/utils';
@@ -26,7 +27,7 @@ export function TopBar() {
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 glass px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-border/60 glass px-4 sm:px-6">
       <Button
         variant="ghost"
         size="icon"
@@ -36,21 +37,26 @@ export function TopBar() {
       >
         <Menu className="h-5 w-5" />
       </Button>
-      <Link href="/boards" className="flex items-center gap-2.5 font-bold tracking-tight">
-        <div className="grid h-9 w-9 place-items-center rounded-xl brand-gradient text-primary-foreground shadow-glow">
-          <span className="text-base">T</span>
+      <Link
+        href="/boards"
+        className="flex items-center gap-2.5 rounded-lg font-bold tracking-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
+      >
+        <div className="grid h-9 w-9 place-items-center rounded-xl brand-gradient text-primary-foreground shadow-glow-sm transition-shadow hover:shadow-glow">
+          <span className="text-base font-bold">I</span>
         </div>
-        <span className="hidden text-base sm:inline">TrelloX</span>
+        <span className="hidden text-base sm:inline">IndiHive</span>
       </Link>
+
+      <WorkspaceToggle />
 
       <button
         type="button"
         onClick={() => setCommandOpen(true)}
-        className="ml-auto hidden h-9 w-72 items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 text-left text-sm text-muted-foreground transition hover:border-border hover:bg-background md:flex"
+        className="group ml-auto hidden h-9 w-72 items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 text-left text-sm text-muted-foreground outline-none transition-all duration-150 hover:border-border hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 md:flex"
       >
-        <Search className="h-4 w-4 shrink-0" />
+        <Search className="h-4 w-4 shrink-0 transition-colors group-hover:text-foreground" />
         <span className="flex-1 truncate whitespace-nowrap">Search boards, cards, members…</span>
-        <kbd className="shrink-0 rounded border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium">
+        <kbd className="shrink-0 rounded-md border border-border/60 bg-background px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
           ⌘K
         </kbd>
       </button>
@@ -72,18 +78,27 @@ export function TopBar() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label="Profile">
-            <Avatar className="h-8 w-8 ring-2 ring-primary/20">
-              <AvatarFallback className="bg-primary/10 text-primary">
+            <Avatar className="h-8 w-8 ring-2 ring-primary/20 transition-all hover:ring-primary/40">
+              <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
                 {getInitials(user?.fullName)}
               </AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuLabel>
-            <div className="flex flex-col">
-              <span className="font-semibold">{user?.fullName ?? 'Guest'}</span>
-              <span className="text-xs font-normal text-muted-foreground">{user?.email}</span>
+        <DropdownMenuContent align="end" className="w-60 rounded-xl shadow-lg">
+          <DropdownMenuLabel className="px-2 py-2">
+            <div className="flex items-center gap-2.5">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                  {getInitials(user?.fullName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold">{user?.fullName ?? 'Guest'}</span>
+                <span className="truncate text-xs font-normal text-muted-foreground">
+                  {user?.email}
+                </span>
+              </div>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />

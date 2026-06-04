@@ -26,7 +26,7 @@ interface Props {
 
 export function ViewSwitcher({ current, onChange }: Props) {
   return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-white/15 p-1 backdrop-blur-sm">
+    <div className="flex w-max items-center gap-0.5 rounded-lg border border-white/10 bg-white/15 p-1 shadow-sm">
       {VIEWS.map(({ id, label, icon: Icon }) => {
         const active = current === id;
         return (
@@ -35,14 +35,14 @@ export function ViewSwitcher({ current, onChange }: Props) {
             type="button"
             onClick={() => onChange(id)}
             className={cn(
-              'relative inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+              'relative inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-0',
               active ? 'text-primary' : 'text-white/90 hover:text-white',
             )}
           >
             {active && (
               <motion.span
                 layoutId="view-switcher-pill"
-                className="absolute inset-0 rounded-md bg-white shadow-sm"
+                className="absolute inset-0 rounded-md bg-white shadow"
                 transition={{ type: 'spring', stiffness: 500, damping: 38 }}
               />
             )}

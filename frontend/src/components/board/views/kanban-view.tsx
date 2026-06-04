@@ -1,7 +1,9 @@
 'use client';
 import { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
-import { ListColumn } from '@/components/board/list-column';
+import { ListColumn, instantDropStyle } from '@/components/board/list-column';
+import { CardTile } from '@/components/board/card-tile';
 import { AddListForm } from '@/components/board/add-list-form';
 import { useMoveCard, useMoveList } from '@/hooks/use-cards';
 import type { BoardFull, Card } from '@/types/api';
@@ -81,8 +83,47 @@ export function KanbanView({ board, onOpenCard }: Props) {
     <DragDropContext onDragEnd={onDragEnd}>
       {/* Outer flex container — AddListForm sits outside the Droppable so the
           library's placeholder is always the last child of the droppable. */}
-      <div className="flex h-full items-start gap-3 overflow-x-auto overflow-y-hidden p-4 pb-8 scrollbar-thin">
-        <Droppable droppableId="board" type="list" direction="horizontal">
+      <div className="flex h-full items-start gap-3 overflow-x-auto overflow-y-hidden p-4 pb-24 scrollbar-thin animate-fade-up lg:pb-8">
+        <Droppable
+          droppableId="board"
+          type="list"
+          direction="horizontal"
+          renderClone={(dragProvided, dragSnapshot, rubric) => {
+            const draggedList = sortedLists.find((l) => l._id === rubric.draggableId);
+            if (!draggedList) return <div />;
+            const listCards = cardsByList.get(draggedList._id) ?? [];
+            // Portal the dragged list to document.body so its `transform:
+            // translate()` is measured against the viewport instead of the
+            // horizontally-scrolling board container (overflow-x-auto creates
+            // a containing block that throws off the drag preview's coordinate
+            // math, so the list drifts away from the cursor). Same fix as the
+            // card clone in list-column.tsx.
+            return createPortal(
+              <div
+                ref={dragProvided.innerRef}
+                {...dragProvided.draggableProps}
+                {...dragProvided.dragHandleProps}
+                style={instantDropStyle(dragProvided, dragSnapshot)}
+                className="flex max-h-[calc(100vh-11rem)] w-72 shrink-0 flex-col rounded-xl border border-border/60 bg-muted p-2 shadow-lg ring-2 ring-primary/60"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2 px-1.5">
+                  <h3 className="truncate text-sm font-semibold tracking-tight">
+                    {draggedList.title}
+                  </h3>
+                  <span className="grid h-5 min-w-[1.25rem] place-items-center rounded-full border border-border/60 bg-background px-1.5 text-[10px] font-semibold text-muted-foreground">
+                    {listCards.length}
+                  </span>
+                </div>
+                <div className="flex min-h-[40px] flex-1 flex-col gap-2 overflow-hidden rounded-lg p-1">
+                  {listCards.map((card) => (
+                    <CardTile key={card._id} card={card} labels={board.labels} isDragging />
+                  ))}
+                </div>
+              </div>,
+              document.body,
+            );
+          }}
+        >
           {(provided) => (
             <div
               ref={provided.innerRef}

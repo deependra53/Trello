@@ -1,14 +1,14 @@
 services:
   mongo:
     image: mongo:7
-    container_name: trellox-mongo
+    container_name: indihive-mongo
     restart: unless-stopped
     ports:
       - '27017:27017'
     environment:
-      MONGO_INITDB_ROOT_USERNAME: trellox
-      MONGO_INITDB_ROOT_PASSWORD: trellox
-      MONGO_INITDB_DATABASE: trellox
+      MONGO_INITDB_ROOT_USERNAME: indihive
+      MONGO_INITDB_ROOT_PASSWORD: indihive
+      MONGO_INITDB_DATABASE: indihive
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -19,14 +19,14 @@ services:
 
   mongo-express:
     image: mongo-express:1
-    container_name: trellox-mongo-express
+    container_name: indihive-mongo-express
     restart: unless-stopped
     ports:
       - '8081:8081'
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: trellox
-      ME_CONFIG_MONGODB_ADMINPASSWORD: trellox
-      ME_CONFIG_MONGODB_URL: mongodb://trellox:trellox@mongo:27017/
+      ME_CONFIG_MONGODB_ADMINUSERNAME: indihive
+      ME_CONFIG_MONGODB_ADMINPASSWORD: indihive
+      ME_CONFIG_MONGODB_URL: mongodb://indihive:indihive@mongo:27017/
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin
     depends_on:
@@ -35,7 +35,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: trellox-redis
+    container_name: indihive-redis
     restart: unless-stopped
     ports:
       - '6379:6379'
@@ -51,14 +51,14 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: trellox-backend
+    container_name: indihive-backend
     restart: unless-stopped
     ports:
       - '4000:4000'
     environment:
       NODE_ENV: development
       PORT: 4000
-      MONGODB_URI: mongodb://trellox:trellox@mongo:27017/trellox?authSource=admin
+      MONGODB_URI: mongodb://indihive:indihive@mongo:27017/indihive?authSource=admin
       REDIS_URL: redis://redis:6379
     env_file:
       - ./backend/.env
@@ -74,7 +74,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: trellox-frontend
+    container_name: indihive-frontend
     restart: unless-stopped
     ports:
       - '3004:3004'

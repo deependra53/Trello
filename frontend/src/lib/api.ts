@@ -5,8 +5,8 @@
  * (see next.config.js). Auth tokens live in localStorage.
  */
 
-const ACCESS_KEY = 'trellox.accessToken';
-const REFRESH_KEY = 'trellox.refreshToken';
+const ACCESS_KEY = 'indihive.accessToken';
+const REFRESH_KEY = 'indihive.refreshToken';
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public details?: unknown) {

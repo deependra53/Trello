@@ -49,6 +49,8 @@ export interface Board {
   starredBy: string[];
   closed: boolean;
   lastActivityAt: string;
+  /** Non-archived card count, attached by the workspace board-list endpoint. */
+  cardCount?: number;
 }
 
 export interface List {
@@ -154,4 +156,148 @@ export interface BoardFull extends Board {
   cards: Card[];
   labels: Label[];
   memberProfiles?: BoardMemberProfile[];
+}
+
+export interface BoardShareLink {
+  enabled: boolean;
+  token: string | null;
+  url: string | null;
+  role: 'admin' | 'member' | 'observer';
+}
+
+export interface BoardInvite {
+  _id: string;
+  email: string | null;
+  role: 'admin' | 'member' | 'observer';
+  status: 'pending' | 'accepted' | 'revoked';
+  createdAt?: string;
+}
+
+export interface BoardInvitePreview {
+  valid: boolean;
+  boardId?: string;
+  boardTitle?: string;
+  invitedBy?: string;
+  email?: string | null;
+}
+
+// --- Organization / Chat ------------------------------------------------------
+
+export interface UserProfile {
+  _id: string;
+  fullName: string;
+  email: string;
+  avatarUrl?: string;
+}
+
+export interface OrgMember {
+  userId: string;
+  role: string;
+  joinedAt?: string;
+  profile?: UserProfile;
+}
+
+export interface Invite {
+  _id: string;
+  workspaceId: string;
+  email: string;
+  role: 'admin' | 'member' | 'guest';
+  status: 'pending' | 'accepted' | 'revoked';
+  createdAt: string;
+}
+
+export interface ChannelSummary {
+  _id: string;
+  workspaceId: string;
+  kind: 'channel' | 'dm';
+  name: string;
+  description?: string;
+  topic?: string;
+  isPrivate?: boolean;
+  memberCount?: number;
+  isMember?: boolean;
+  createdBy?: string;
+  lastMessageAt?: string;
+  unreadCount: number;
+  // DM-only
+  participants?: UserProfile[];
+  otherUser?: UserProfile;
+}
+
+export interface ChannelDetail {
+  _id: string;
+  workspaceId: string;
+  kind: 'channel' | 'dm';
+  name: string;
+  description?: string;
+  topic?: string;
+  isPrivate?: boolean;
+  archived?: boolean;
+  createdBy?: string;
+  isMember: boolean;
+  members: Array<{ userId: string; role: string; profile?: UserProfile }>;
+}
+
+export interface ChatAttachment {
+  name: string;
+  url: string;
+  mimeType?: string;
+  size?: number;
+}
+
+export interface ChatReaction {
+  emoji: string;
+  userIds: string[];
+}
+
+export interface ChatMessage {
+  _id: string;
+  channelId: string;
+  authorId: string;
+  author?: UserProfile;
+  body: string;
+  deleted?: boolean;
+  mentions: string[];
+  attachments: ChatAttachment[];
+  parentId: string | null;
+  replyCount: number;
+  lastReplyAt?: string;
+  reactions: ChatReaction[];
+  pinned?: boolean;
+  pinnedBy?: string;
+  editedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+  // search-only
+  channelName?: string;
+  channelKind?: 'channel' | 'dm';
+  // client-only: correlation id for optimistic sends (matches the server echo),
+  // and a flag marking a message that's still being delivered to the server.
+  clientId?: string;
+  pending?: boolean;
+}
+
+export interface UnreadCounts {
+  total: number;
+  byChannel: Record<string, number>;
+}
+
+export interface ThreadParticipant {
+  _id: string;
+  fullName: string;
+  avatarUrl?: string;
+}
+
+export interface ThreadSummary {
+  root: ChatMessage;
+  channel: { _id: string; kind: 'channel' | 'dm'; name: string } | null;
+  /** The last up to two messages of the thread, oldest-first (preview). */
+  lastMessages: ChatMessage[];
+  /** Distinct people in the thread (root author + repliers), capped for avatars. */
+  participants: ThreadParticipant[];
+  participantCount: number;
+  /** New activity in this thread's channel that I haven't caught up on. */
+  unread: boolean;
+  /** I'm @-mentioned somewhere in the thread. */
+  mentioned: boolean;
 }

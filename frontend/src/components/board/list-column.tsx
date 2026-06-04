@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 // default 250ms drop animation run leaves the source list holding empty
 // placeholder space for that quarter-second, which then snaps shut and
 // reads as a "column grew taller for a moment" glitch.
-function instantDropStyle(
+export function instantDropStyle(
   provided: DraggableProvided,
   snapshot: DraggableStateSnapshot,
 ) {
@@ -37,7 +37,7 @@ interface Props {
 }
 
 export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: Props) {
-  const storageKey = `trello:collapsed:${boardId}:${list._id}`;
+  const storageKey = `indihive:collapsed:${boardId}:${list._id}`;
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -65,9 +65,9 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
             // drag preview's coordinate math. The portaled clone (below) is
             // what fixes the visible-position issue, but keeping the column
             // free of filter ancestors is the defensive belt-and-braces.
-            'flex max-h-[calc(100vh-11rem)] shrink-0 flex-col rounded-xl bg-muted p-2 shadow-soft',
+            'flex max-h-[calc(100vh-13rem)] shrink-0 flex-col rounded-xl border border-border/60 bg-muted p-2 shadow-sm transition-shadow lg:max-h-[calc(100vh-11rem)]',
             collapsed ? 'w-11' : 'w-72',
-            snapshot.isDragging && 'rotate-1 ring-2 ring-primary',
+            snapshot.isDragging && 'rotate-1 shadow-lg ring-2 ring-primary/60',
           )}
         >
           {collapsed ? (
@@ -86,7 +86,7 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
                 <Maximize2 className="h-3.5 w-3.5" />
               </Button>
               <div
-                className="flex flex-1 items-start justify-center gap-2 whitespace-nowrap text-sm font-semibold"
+                className="flex flex-1 items-start justify-center gap-2 whitespace-nowrap text-sm font-semibold tracking-tight"
                 style={{ writingMode: 'vertical-rl' }}
               >
                 <span>{list.title}</span>
@@ -99,11 +99,11 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
             <>
               <div
                 {...provided.dragHandleProps}
-                className="drag-handle mb-2 flex items-center justify-between px-1.5"
+                className="drag-handle mb-2 flex items-center justify-between gap-2 px-1.5"
               >
-                <h3 className="text-sm font-semibold">{list.title}</h3>
+                <h3 className="truncate text-sm font-semibold tracking-tight">{list.title}</h3>
                 <div className="flex items-center gap-1">
-                  <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                  <span className="grid h-5 min-w-[1.25rem] place-items-center rounded-full border border-border/60 bg-background px-1.5 text-[10px] font-semibold text-muted-foreground">
                     {cards.length}
                   </span>
                   <Button
@@ -152,8 +152,8 @@ export function ListColumn({ list, cards, labels, index, boardId, onOpenCard }: 
                     ref={dropProvided.innerRef}
                     {...dropProvided.droppableProps}
                     className={cn(
-                      'flex min-h-[40px] flex-1 flex-col gap-2 overflow-y-auto rounded-md p-1 scrollbar-thin transition-colors',
-                      dropSnapshot.isDraggingOver && 'bg-accent/40 ring-2 ring-primary/30',
+                      'flex min-h-[40px] flex-1 flex-col gap-2 overflow-y-auto rounded-lg p-1 scrollbar-thin transition-colors',
+                      dropSnapshot.isDraggingOver && 'bg-primary/10 ring-2 ring-primary/30',
                     )}
                   >
                     {cards.map((card, i) => (

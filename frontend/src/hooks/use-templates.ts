@@ -3,13 +3,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { Board } from '@/types/api';
 
+export interface TemplateCard {
+  title?: string;
+  labels?: string[];
+}
+export interface TemplateList {
+  title: string;
+  cards?: TemplateCard[];
+}
 export interface Template {
   _id: string;
   name: string;
   description?: string;
   category?: string;
   background?: { type: 'color' | 'gradient'; value: string };
-  structure?: { lists?: Array<{ title: string }> };
+  structure?: {
+    labels?: Array<{ name: string; color: string }>;
+    lists?: TemplateList[];
+  };
   useCount?: number;
 }
 

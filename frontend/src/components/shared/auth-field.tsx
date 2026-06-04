@@ -25,14 +25,14 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(function A
         </Label>
         {rightSlot}
       </div>
-      <div className="relative">
-        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+      <div className="group relative">
+        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary">
           {icon}
         </span>
         <Input
           id={id}
           ref={ref}
-          className="h-12 rounded-xl bg-card pl-10 text-[15px] shadow-sm transition-all focus-visible:ring-primary/40"
+          className="h-12 rounded-xl border-border/60 bg-card pl-10 text-[15px] shadow-sm transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
           {...props}
         />
       </div>

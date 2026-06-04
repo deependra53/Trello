@@ -45,9 +45,9 @@ export default function HomePage() {
       <header className="container flex h-16 items-center">
         <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
           <div className="grid h-9 w-9 place-items-center rounded-xl brand-gradient text-primary-foreground shadow-glow">
-            T
+            I
           </div>
-          TrelloX
+          IndiHive
         </Link>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
@@ -60,9 +60,9 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="container flex flex-col items-center gap-6 py-20 text-center md:py-28">
-        <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-soft">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /> Now shipping
+      <section className="container flex flex-col items-center gap-6 py-20 text-center md:py-28 animate-fade-up">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" /> Now shipping
           phase by phase
         </span>
         <h1 className="max-w-3xl text-5xl font-extrabold tracking-tight md:text-7xl">
@@ -72,7 +72,7 @@ export default function HomePage() {
           together.
         </h1>
         <p className="max-w-2xl text-lg text-muted-foreground md:text-xl">
-          TrelloX is a collaborative kanban for teams that build. Six board views, real-time sync,
+          IndiHive is a collaborative kanban for teams that build. Six board views, real-time sync,
           automation, and a calm UI for getting things done.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -96,11 +96,11 @@ export default function HomePage() {
 
       {/* Hero board preview */}
       <section className="container pb-20">
-        <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border bg-card shadow-soft">
+        <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border border-border/60 bg-card shadow-xl">
           <div className="brand-gradient h-10" />
           <div className="grid gap-3 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {['Backlog', 'In Progress', 'Review', 'Done'].map((title, i) => (
-              <div key={title} className="rounded-xl bg-muted/40 p-3">
+              <div key={title} className="rounded-xl border border-border/60 bg-muted/40 p-3">
                 <div className="mb-3 flex items-center justify-between text-xs font-semibold">
                   <span>{title}</span>
                   <span className="rounded-full bg-background px-2 text-[10px] text-muted-foreground">
@@ -111,7 +111,7 @@ export default function HomePage() {
                   {Array.from({ length: 3 + i }).map((_, j) => (
                     <div
                       key={j}
-                      className="rounded-lg bg-card p-2.5 shadow-soft fade-up"
+                      className="fade-up rounded-lg border border-border/60 bg-card p-2.5 shadow-sm"
                       style={{ animationDelay: `${(i * 3 + j) * 40}ms` }}
                     >
                       <div className="mb-2 h-1.5 w-12 rounded-full bg-primary/40" />
@@ -133,20 +133,20 @@ export default function HomePage() {
         {features.map(({ icon: Icon, title, text }) => (
           <div
             key={title}
-            className="group relative overflow-hidden rounded-2xl border bg-card p-6 shadow-soft transition hover:shadow-glow"
+            className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-6 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-glow"
           >
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/10 opacity-0 transition group-hover:opacity-100" />
-            <div className="grid h-10 w-10 place-items-center rounded-xl brand-gradient text-primary-foreground">
+            <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/10 opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="grid h-11 w-11 place-items-center rounded-xl brand-gradient text-primary-foreground shadow-glow-sm">
               <Icon className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 font-semibold">{title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+            <h3 className="mt-4 font-semibold tracking-tight">{title}</h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">{text}</p>
           </div>
         ))}
       </section>
 
-      <footer className="border-t bg-background py-8 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} TrelloX. Built phase by phase, in the open.
+      <footer className="border-t border-border/60 bg-background py-8 text-center text-sm text-muted-foreground">
+        © {new Date().getFullYear()} IndiHive. Built phase by phase, in the open.
       </footer>
     </main>
   );

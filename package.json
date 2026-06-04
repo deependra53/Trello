@@ -1,8 +1,8 @@
 {
-  "name": "trellox",
+  "name": "indihive",
   "version": "0.1.0",
   "private": true,
-  "description": "TrelloX — a production-grade Trello clone (Next.js + Node.js + MongoDB)",
+  "description": "IndiHive — a production-grade team collaboration platform: boards + chat (Next.js + Node.js + MongoDB)",
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=20"

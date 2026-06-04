@@ -28,8 +28,14 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 6% 92%;
-    --input: 240 6% 92%;
+    --success: 142 71% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
     --ring: 252 100% 68%;
 
     --radius: 0.75rem;
@@ -39,33 +45,39 @@
   }
 
   .dark {
-    --background: 240 14% 6%;
-    --foreground: 0 0% 98%;
+    --background: 240 12% 5%;
+    --foreground: 0 0% 96%;
 
-    --card: 240 12% 9%;
-    --card-foreground: 0 0% 98%;
+    --card: 240 10% 8%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 240 12% 9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 10% 9%;
+    --popover-foreground: 0 0% 96%;
 
-    --primary: 252 100% 70%;
+    --primary: 252 100% 71%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 8% 14%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 240 7% 14%;
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 240 8% 14%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 240 7% 13%;
+    --muted-foreground: 240 5% 62%;
 
-    --accent: 252 60% 20%;
+    --accent: 252 55% 19%;
     --accent-foreground: 252 100% 92%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 8% 16%;
-    --input: 240 8% 16%;
-    --ring: 252 100% 70%;
+    --success: 142 64% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 240 12% 8%;
+
+    --border: 240 7% 15%;
+    --input: 240 7% 16%;
+    --ring: 252 100% 71%;
   }
 }
 
@@ -95,11 +107,55 @@
     background-clip: text;
     color: transparent;
   }
+  /* Solid translucent chrome — intentionally NO backdrop-blur (it re-rasterizes
+     everything behind it on every scroll frame; see CLAUDE.md performance rules). */
   .glass {
-    @apply bg-background/70 backdrop-blur-md backdrop-saturate-150;
+    @apply bg-background/85;
+  }
+  /* Brand-tinted navigation surface — gives the nav rails a signature violet
+     identity (à la Slack's aubergine rail) while content stays neutral. The
+     tint is an opacity-on-primary gradient so it adapts to light & dark. */
+  .brand-surface {
+    background-color: hsl(var(--card));
+    background-image: linear-gradient(
+      180deg,
+      hsl(var(--primary) / 0.13),
+      hsl(var(--primary) / 0.05) 45%,
+      hsl(var(--primary) / 0.03)
+    );
   }
   .ring-brand {
     box-shadow: 0 0 0 4px hsl(var(--primary) / 0.18);
+  }
+  /* Hairline divider that adapts to theme. */
+  .hairline {
+    @apply border-border/60;
+  }
+  /* Loading placeholder with a sweeping shimmer. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.06),
+      transparent
+    );
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
 
@@ -160,6 +216,73 @@
     -webkit-user-select: none;
     user-select: none;
   }
+}
+
+/* Tiptap chat composer — Tailwind's preflight strips list markers and the
+   editor needs WYSIWYG bullets/numbers, so re-assert them here (scoped to the
+   composer so nothing else is affected). */
+.tiptap-composer .ProseMirror {
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tiptap-composer .ProseMirror > * + * {
+  margin-top: 0.25rem;
+}
+.tiptap-composer .ProseMirror p {
+  margin: 0;
+}
+/* Placeholder text for the empty editor. */
+.tiptap-composer .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--muted-foreground));
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.tiptap-composer .ProseMirror ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.tiptap-composer .ProseMirror ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.tiptap-composer .ProseMirror li {
+  margin: 0.1rem 0;
+}
+.tiptap-composer .ProseMirror li > p {
+  margin: 0;
+}
+.tiptap-composer .ProseMirror blockquote {
+  border-left: 2px solid hsl(var(--primary) / 0.5);
+  padding-left: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.tiptap-composer .ProseMirror pre {
+  background: hsl(var(--muted) / 0.7);
+  border: 1px solid hsl(var(--border) / 0.6);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  overflow-x: auto;
+}
+.tiptap-composer .ProseMirror code {
+  background: hsl(var(--muted));
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}
+.tiptap-composer .ProseMirror pre code {
+  background: none;
+  padding: 0;
+}
+.tiptap-composer .ProseMirror a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* Smooth scrolling */

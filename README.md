@@ -1,6 +1,6 @@
-# TrelloX
+# IndiHive
 
-A production-grade Trello clone built with **Next.js 14 + Node.js + MongoDB**, real-time collaboration via Socket.IO, and a full set of Trello-parity features.
+IndiHive is a production-grade team collaboration platform — Trello-style boards plus a Slack-style chat, organized per organization — built with **Next.js 14 + Node.js + MongoDB** and real-time collaboration via Socket.IO.
 
 > Status: **Phase 0 — Scaffolding complete.** Subsequent phases come online incrementally.
 
@@ -34,7 +34,7 @@ pnpm dev
 ## Repository layout
 
 ```
-trellox/
+indihive/
 ├── backend/    Express + Mongoose API
 ├── frontend/   Next.js 14 App Router UI
 ├── shared/     Cross-package TS types
@@ -53,7 +53,7 @@ trellox/
 | `pnpm lint`         | Lint all packages                              |
 | `pnpm typecheck`    | Typecheck all packages                         |
 | `pnpm test`         | Run tests across packages                      |
-| `pnpm seed`         | Seed demo workspace + boards (`demo@trellox.app` / `demo1234`) |
+| `pnpm seed`         | Seed demo workspace + boards (`demo@indihive.app` / `demo1234`) |
 
 ## Phase plan
 

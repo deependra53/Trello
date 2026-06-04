@@ -71,31 +71,31 @@ export function TableView({ board, onOpenCard }: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-3 shadow-soft">
-        <Search className="h-4 w-4 text-muted-foreground" />
+    <div className="flex h-full flex-col gap-3 p-4 pb-24 animate-fade-up lg:pb-4">
+      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-2 pl-3 shadow-sm">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
         <Input
           placeholder="Filter cards by title or description…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-8 border-0 shadow-none focus-visible:ring-0"
+          className="h-8 border-0 bg-transparent shadow-none focus-visible:ring-0"
         />
-        <span className="text-xs text-muted-foreground">
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {sorted.length} card{sorted.length === 1 ? '' : 's'}
         </span>
       </div>
 
-      <div className="flex-1 overflow-auto rounded-xl border border-border/60 bg-card shadow-soft scrollbar-thin">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-card">
-            <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
+      <div className="flex-1 overflow-auto rounded-xl border border-border/60 bg-card shadow-sm scrollbar-thin">
+        <table className="w-full min-w-[44rem] text-sm">
+          <thead className="sticky top-0 z-10 bg-card/95">
+            <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <Th onClick={() => toggleSort('title')} active={sort.field === 'title'}>
                 Title
               </Th>
               <Th onClick={() => toggleSort('list')} active={sort.field === 'list'}>
                 List
               </Th>
-              <th className="px-3 py-2.5 font-semibold">Labels</th>
+              <th className="px-3 py-3 font-semibold">Labels</th>
               <Th onClick={() => toggleSort('dueDate')} active={sort.field === 'dueDate'}>
                 Due
               </Th>
@@ -110,8 +110,16 @@ export function TableView({ board, onOpenCard }: Props) {
             ))}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
-                  No cards match your filter.
+                <td colSpan={5} className="p-12">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+                      <Search className="h-6 w-6" />
+                    </div>
+                    <p className="mt-4 text-sm font-medium">No cards match your filter</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Try a different search term.
+                    </p>
+                  </div>
                 </td>
               </tr>
             )}
@@ -132,17 +140,17 @@ function Th({
   children: React.ReactNode;
 }) {
   return (
-    <th className="px-3 py-2.5 font-semibold">
+    <th className="px-3 py-3 font-semibold">
       <button
         type="button"
         onClick={onClick}
         className={cn(
-          'inline-flex items-center gap-1 transition hover:text-foreground',
+          'inline-flex items-center gap-1 rounded transition-colors hover:text-foreground',
           active && 'text-primary',
         )}
       >
         {children}
-        <ArrowUpDown className="h-3 w-3" />
+        <ArrowUpDown className={cn('h-3 w-3 transition-colors', active ? 'opacity-100' : 'opacity-50')} />
       </button>
     </th>
   );
@@ -164,19 +172,19 @@ function Row({
     card.dueDate && !card.dueComplete && new Date(card.dueDate) < new Date();
   return (
     <tr
-      className="cursor-pointer border-b border-border/60 transition hover:bg-muted/40"
+      className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-muted/60"
       onClick={() => onOpen(card._id)}
     >
-      <td className="px-3 py-2.5 font-medium">{card.title}</td>
-      <td className="px-3 py-2.5 text-xs text-muted-foreground">
+      <td className="px-3 py-3 font-medium text-foreground">{card.title}</td>
+      <td className="px-3 py-3 text-xs text-muted-foreground">
         {listMap.get(card.listId)?.title ?? '—'}
       </td>
-      <td className="px-3 py-2.5">
+      <td className="px-3 py-3">
         <div className="flex flex-wrap gap-1">
           {cardLabels.map((l) => (
             <span
               key={l._id}
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
               style={{ backgroundColor: l.color }}
             >
               {l.name || '—'}
@@ -184,10 +192,15 @@ function Row({
           ))}
         </div>
       </td>
-      <td className={cn('px-3 py-2.5 text-xs', overdue && 'text-red-600 font-semibold')}>
+      <td
+        className={cn(
+          'px-3 py-3 text-xs text-muted-foreground',
+          overdue && 'font-semibold text-destructive',
+        )}
+      >
         {card.dueDate ? format(new Date(card.dueDate), 'MMM d, h:mm a') : '—'}
       </td>
-      <td className="px-3 py-2.5 text-xs text-muted-foreground">
+      <td className="px-3 py-3 text-xs text-muted-foreground">
         {card.members?.length ?? 0}
       </td>
     </tr>

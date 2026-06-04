@@ -16,11 +16,13 @@ import {
   Paperclip,
   Plus,
   Search,
+  Share2,
   Tag,
   Trash2,
   User as UserIcon,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -51,7 +53,7 @@ import {
   type CardActivity,
 } from '@/hooks/use-cards';
 import { useAuthStore } from '@/stores/auth';
-import { cn, getInitials } from '@/lib/utils';
+import { cardShareUrl, cn, getInitials } from '@/lib/utils';
 import type {
   BoardFull,
   BoardMemberProfile,
@@ -82,11 +84,23 @@ export function CardModal({ card, board, open, onClose }: Props) {
   const [editingDesc, setEditingDesc] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [bouncing, setBouncing] = useState(false);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow the title field to fit a long (wrapped) title instead of clipping it,
+  // the way a single-line <input> would.
+  function autosizeTitle() {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }
 
   useEffect(() => {
     setTitle(card.title);
     setDescription(card.description ?? '');
   }, [card._id, card.title, card.description]);
+
+  useEffect(autosizeTitle, [title, open]);
 
   const list = board.lists.find((l) => l._id === card.listId);
   const isWatching = card.watchers?.includes(user?._id ?? '') ?? false;
@@ -109,14 +123,37 @@ export function CardModal({ card, board, open, onClose }: Props) {
     updateCard.mutate({ cardId: card._id, patch: { dueComplete: !card.dueComplete } });
   }
 
+  async function copyShareLink() {
+    const url = cardShareUrl(board._id, card._id);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // Fallback for non-secure contexts (e.g. http://localhost) where the
+        // async Clipboard API isn't available.
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      toast.success('Card link copied to clipboard');
+    } catch {
+      toast.error('Could not copy the link');
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto p-0 scrollbar-thin sm:rounded-xl">
+      <DialogContent className="max-h-[92vh] max-w-[calc(100vw-1rem)] overflow-y-auto border-border/60 p-0 shadow-xl scrollbar-thin sm:max-w-5xl sm:rounded-2xl">
         {card.cover?.type === 'color' && (
-          <div className="h-20" style={{ backgroundColor: card.cover.value }} />
+          <div className="h-24" style={{ backgroundColor: card.cover.value }} />
         )}
         {card.cover?.type === 'gradient' && (
-          <div className="h-20" style={{ backgroundImage: card.cover.value }} />
+          <div className="h-24" style={{ backgroundImage: card.cover.value }} />
         )}
         {card.cover && (card.cover.type === 'image' || card.cover.type === 'attachment') && (
           <a
@@ -130,7 +167,7 @@ export function CardModal({ card, board, open, onClose }: Props) {
               src={card.cover.value}
               alt=""
               className={cn(
-                'w-full object-cover transition hover:opacity-95',
+                'w-full object-cover transition-opacity duration-150 hover:opacity-95',
                 card.cover.size === 'full' ? 'h-64' : 'h-40',
               )}
             />
@@ -138,7 +175,7 @@ export function CardModal({ card, board, open, onClose }: Props) {
         )}
 
         <div className="flex items-center gap-1 px-4 pt-4 pr-12 sm:px-6 sm:pr-14">
-          <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-medium">
+          <span className="rounded-full border border-border/60 bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
             {list?.title ?? '—'}
           </span>
           <div className="ml-auto flex items-center gap-1 text-muted-foreground">
@@ -146,7 +183,10 @@ export function CardModal({ card, board, open, onClose }: Props) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className={cn(
+                'h-8 w-8 rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                isWatching && 'bg-primary/10 text-primary hover:text-primary',
+              )}
               title={isWatching ? 'Unwatch' : 'Watch'}
               onClick={() => watchCard.mutate(card._id)}
             >
@@ -155,7 +195,16 @@ export function CardModal({ card, board, open, onClose }: Props) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              title="Copy card link"
+              onClick={copyShareLink}
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               title="More"
             >
               <MoreHorizontal className="h-4 w-4" />
@@ -163,13 +212,13 @@ export function CardModal({ card, board, open, onClose }: Props) {
           </div>
         </div>
 
-        <div className="grid gap-6 px-4 pb-6 pt-4 sm:px-6 md:grid-cols-[1fr_340px]">
+        <div className="grid gap-8 px-4 pb-6 pt-4 sm:px-6 md:grid-cols-[1fr_340px]">
           <div className="min-w-0 space-y-6">
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3">
               <button
                 type="button"
                 onClick={toggleComplete}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
+                className="mt-1 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 title={card.dueComplete ? 'Mark incomplete' : 'Mark complete'}
               >
                 <span
@@ -177,19 +226,31 @@ export function CardModal({ card, board, open, onClose }: Props) {
                   onAnimationEnd={() => setBouncing(false)}
                 >
                   {card.dueComplete ? (
-                    <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                    <CheckCircle2 className="h-6 w-6 text-success" />
                   ) : (
                     <Circle className="h-6 w-6" />
                   )}
                 </span>
               </button>
               <DialogTitle asChild>
-                <input
+                <textarea
+                  ref={titleRef}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  rows={1}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    autosizeTitle();
+                  }}
                   onBlur={saveTitle}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                  className="w-full bg-transparent text-2xl font-bold leading-tight outline-none focus:border-b focus:border-primary"
+                  // Enter saves (blurs) rather than inserting a newline; the box
+                  // still wraps long titles across as many lines as needed.
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      (e.target as HTMLTextAreaElement).blur();
+                    }
+                  }}
+                  className="w-full resize-none overflow-hidden break-words rounded-lg bg-transparent px-1 py-0.5 text-2xl font-bold leading-tight tracking-tight outline-none transition-colors hover:bg-muted/50 focus:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </DialogTitle>
             </div>
@@ -208,7 +269,9 @@ export function CardModal({ card, board, open, onClose }: Props) {
             <CardChips card={card} board={board} />
 
             <section>
-              <h3 className="mb-2 text-sm font-semibold">Description</h3>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Description
+              </h3>
               {editingDesc ? (
                 <div className="space-y-2">
                   <Textarea
@@ -237,7 +300,7 @@ export function CardModal({ card, board, open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => setEditingDesc(true)}
-                  className="block w-full whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-left text-sm hover:bg-muted"
+                  className="block w-full whitespace-pre-wrap rounded-xl border border-border/60 bg-muted/40 p-4 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 >
                   {description || (
                     <span className="text-muted-foreground">Add a more detailed description…</span>
@@ -259,13 +322,15 @@ export function CardModal({ card, board, open, onClose }: Props) {
             <AttachmentsSection boardId={board._id} card={card} />
           </div>
 
-          <aside className="space-y-3 text-sm">
+          <aside className="space-y-4 text-sm md:rounded-2xl md:border md:border-border/60 md:bg-muted/30 md:p-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Comments and activity</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Comments and activity
+              </h3>
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 px-2 text-xs"
+                className="h-7 rounded-lg px-2 text-xs transition-colors"
                 onClick={() => setShowDetails((v) => !v)}
               >
                 {showDetails ? 'Hide details' : 'Show details'}
@@ -280,14 +345,15 @@ export function CardModal({ card, board, open, onClose }: Props) {
               showActivity={showDetails}
               activity={activity ?? []}
             />
-            <div className="pt-4">
+            <div className="border-t border-border/60 pt-4">
               <button
                 onClick={() => {
                   archiveCard.mutate(card._id);
                   onClose();
                 }}
-                className="text-xs text-muted-foreground hover:text-destructive"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               >
+                <Trash2 className="h-3.5 w-3.5" />
                 Archive card
               </button>
             </div>
@@ -312,10 +378,10 @@ function ActionBtn({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors',
+        'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium shadow-xs transition-all duration-150',
         active
           ? 'border-primary/30 bg-primary/10 text-primary'
-          : 'border-input bg-card hover:bg-accent',
+          : 'border-border/60 bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -396,18 +462,18 @@ function CoverPopover({ boardId, card }: { boardId: string; card: Card }) {
           variant="ghost"
           size="icon"
           className={cn(
-            'h-8 w-8 hover:text-foreground',
-            cover ? 'text-primary' : 'text-muted-foreground',
+            'h-8 w-8 rounded-lg transition-colors hover:bg-muted hover:text-foreground',
+            cover ? 'bg-primary/10 text-primary hover:text-primary' : 'text-muted-foreground',
           )}
           title="Cover"
         >
           <ImageIcon className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72">
-        <div className="mb-2 text-center text-sm font-semibold">Cover</div>
+      <PopoverContent className="w-72 max-w-[calc(100vw-2rem)] shadow-lg">
+        <div className="mb-3 text-center text-sm font-semibold">Cover</div>
 
-        <div className="mb-3 text-xs font-medium text-muted-foreground">Colors</div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Colors</div>
         <div className="grid grid-cols-5 gap-2">
           {COVER_COLORS.map((c) => {
             const on = cover?.type === 'color' && cover.value === c;
@@ -417,8 +483,8 @@ function CoverPopover({ boardId, card }: { boardId: string; card: Card }) {
                 type="button"
                 onClick={() => setColor(c)}
                 className={cn(
-                  'h-9 rounded-md transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-ring',
-                  on && 'ring-2 ring-ring ring-offset-2 ring-offset-background',
+                  'h-9 rounded-lg shadow-xs transition-transform duration-150 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+                  on && 'ring-2 ring-ring ring-offset-2 ring-offset-popover',
                 )}
                 style={{ backgroundColor: c }}
                 aria-label={`Cover color ${c}`}
@@ -427,7 +493,7 @@ function CoverPopover({ boardId, card }: { boardId: string; card: Card }) {
           })}
         </div>
 
-        <div className="mt-4 mb-2 text-xs font-medium text-muted-foreground">Gradients</div>
+        <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gradients</div>
         <div className="grid grid-cols-5 gap-2">
           {COVER_GRADIENTS.map((g) => {
             const on = cover?.type === 'gradient' && cover.value === g;
@@ -437,8 +503,8 @@ function CoverPopover({ boardId, card }: { boardId: string; card: Card }) {
                 type="button"
                 onClick={() => setGradient(g)}
                 className={cn(
-                  'h-9 rounded-md transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-ring',
-                  on && 'ring-2 ring-ring ring-offset-2 ring-offset-background',
+                  'h-9 rounded-lg shadow-xs transition-transform duration-150 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+                  on && 'ring-2 ring-ring ring-offset-2 ring-offset-popover',
                 )}
                 style={{ backgroundImage: g }}
                 aria-label="Cover gradient"
@@ -447,7 +513,7 @@ function CoverPopover({ boardId, card }: { boardId: string; card: Card }) {
           })}
         </div>
 
-        <div className="mt-4 mb-2 text-xs font-medium text-muted-foreground">Image URL</div>
+        <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Image URL</div>
         <div className="flex gap-2">
           <Input
             placeholder="https://…"
@@ -462,7 +528,7 @@ function CoverPopover({ boardId, card }: { boardId: string; card: Card }) {
 
         {(cover?.type === 'image' || cover?.type === 'attachment') && (
           <>
-            <div className="mt-4 mb-2 text-xs font-medium text-muted-foreground">Size</div>
+            <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Size</div>
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -552,8 +618,8 @@ function LabelsPopover({
           <ActionBtn icon={Tag} label="Labels" active={selected.size > 0} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72">
-        <div className="mb-2 text-center text-sm font-semibold">Labels</div>
+      <PopoverContent className="w-72 max-w-[calc(100vw-2rem)] shadow-lg">
+        <div className="mb-3 text-center text-sm font-semibold">Labels</div>
         <div className="space-y-1.5">
           {labels.length === 0 && !creating && (
             <p className="px-1 py-2 text-center text-xs text-muted-foreground">
@@ -567,10 +633,10 @@ function LabelsPopover({
                 key={l._id}
                 type="button"
                 onClick={() => toggle.mutate({ cardId: card._id, labelId: l._id })}
-                className="flex w-full items-center gap-2 rounded-md p-1 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-lg p-1 text-left text-sm transition-colors hover:bg-muted"
               >
                 <span
-                  className="h-7 flex-1 rounded-md px-2 leading-7 text-xs font-medium text-white"
+                  className="h-7 flex-1 rounded-md px-2 text-xs font-semibold leading-7 text-white shadow-xs"
                   style={{ backgroundColor: l.color }}
                 >
                   {l.name || ' '}
@@ -581,7 +647,7 @@ function LabelsPopover({
           })}
         </div>
 
-        <div className="mt-3 border-t pt-3">
+        <div className="mt-3 border-t border-border/60 pt-3">
           {creating ? (
             <div className="space-y-2.5">
               <div>
@@ -610,7 +676,7 @@ function LabelsPopover({
                         type="button"
                         onClick={() => setNewColor(c)}
                         className={cn(
-                          'h-7 rounded-md transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-ring',
+                          'h-7 rounded-md shadow-xs transition-transform duration-150 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
                           on && 'ring-2 ring-ring ring-offset-2 ring-offset-popover',
                         )}
                         style={{ backgroundColor: c }}
@@ -676,8 +742,8 @@ function MembersPopover({
           <ActionBtn icon={UserIcon} label="Members" active={selected.size > 0} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72">
-        <div className="mb-2 text-center text-sm font-semibold">Members</div>
+      <PopoverContent className="w-72 max-w-[calc(100vw-2rem)] shadow-lg">
+        <div className="mb-3 text-center text-sm font-semibold">Members</div>
         <div className="relative mb-3">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -687,7 +753,7 @@ function MembersPopover({
             className="h-9 pl-8 text-sm"
           />
         </div>
-        <div className="mb-1 text-xs font-semibold text-muted-foreground">Board members</div>
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Board members</div>
         <div className="space-y-1">
           {filtered.length === 0 && (
             <p className="px-1 py-2 text-xs text-muted-foreground">No matches.</p>
@@ -699,7 +765,7 @@ function MembersPopover({
                 key={m._id}
                 type="button"
                 onClick={() => toggle.mutate({ cardId: card._id, userId: m._id })}
-                className="flex w-full items-center gap-2 rounded-md p-1.5 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-lg p-1.5 text-left text-sm transition-colors hover:bg-muted"
               >
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
@@ -762,8 +828,8 @@ function DatesPopover({ boardId, card }: { boardId: string; card: Card }) {
           <ActionBtn icon={CalendarIcon} label="Dates" active={!!(card.startDate || card.dueDate)} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80">
-        <div className="mb-2 text-center text-sm font-semibold">Dates</div>
+      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] shadow-lg">
+        <div className="mb-3 text-center text-sm font-semibold">Dates</div>
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -832,8 +898,8 @@ function ChecklistPopover({ boardId, card }: { boardId: string; card: Card }) {
           />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72">
-        <div className="mb-2 text-center text-sm font-semibold">Add checklist</div>
+      <PopoverContent className="w-72 max-w-[calc(100vw-2rem)] shadow-lg">
+        <div className="mb-3 text-center text-sm font-semibold">Add checklist</div>
         <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Title
         </label>
@@ -863,13 +929,13 @@ function CardChips({ card, board }: { card: Card; board: BoardFull }) {
     return null;
 
   return (
-    <div className="flex flex-wrap items-end gap-4 pl-9 text-xs">
+    <div className="flex flex-wrap items-end gap-6 pl-9 text-xs">
       {assigned.length > 0 && (
         <div>
-          <div className="mb-1 font-semibold text-muted-foreground">Members</div>
-          <div className="flex -space-x-1">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Members</div>
+          <div className="flex -space-x-1.5">
             {assigned.slice(0, 6).map((m) => (
-              <Avatar key={m._id} className="h-7 w-7 border-2 border-background" title={m.fullName}>
+              <Avatar key={m._id} className="h-7 w-7 border-2 border-background shadow-xs" title={m.fullName}>
                 <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
                   {getInitials(m.fullName)}
                 </AvatarFallback>
@@ -880,12 +946,12 @@ function CardChips({ card, board }: { card: Card; board: BoardFull }) {
       )}
       {cardLabels.length > 0 && (
         <div>
-          <div className="mb-1 font-semibold text-muted-foreground">Labels</div>
-          <div className="flex flex-wrap gap-1">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Labels</div>
+          <div className="flex flex-wrap gap-1.5">
             {cardLabels.map((l) => (
               <span
                 key={l._id}
-                className="rounded-md px-2 py-1 text-[11px] font-semibold text-white"
+                className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs"
                 style={{ backgroundColor: l.color }}
               >
                 {l.name || ' '}
@@ -896,8 +962,8 @@ function CardChips({ card, board }: { card: Card; board: BoardFull }) {
       )}
       {card.dueDate && (
         <div>
-          <div className="mb-1 font-semibold text-muted-foreground">Due date</div>
-          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Due date</div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted px-2.5 py-1 font-medium">
             <CalendarIcon className="h-3 w-3" />
             {format(new Date(card.dueDate), 'PP p')}
           </span>
@@ -985,17 +1051,17 @@ function ChecklistSection({
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+          className="h-7 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           onClick={() => remove.mutate({ cardId: card._id, checklistId: checklist.id })}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
       <div className="mb-2 flex items-center gap-2 pl-6 text-xs text-muted-foreground">
-        <span className="w-8 text-right tabular-nums">{pct}%</span>
+        <span className="w-8 text-right font-medium tabular-nums">{pct}%</span>
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full bg-emerald-500 transition-[width] duration-300"
+            className="h-full rounded-full bg-success transition-[width] duration-300"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -1081,19 +1147,19 @@ function ChecklistItemRow({
   const overdue = due ? due < new Date() && !item.completed : false;
 
   return (
-    <li className="group flex items-start gap-2 rounded-md px-1 py-1 hover:bg-accent/40">
+    <li className="group flex items-start gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-muted">
       <button
         type="button"
         onClick={() =>
           update.mutate({ cardId, itemId: item.id, patch: { completed: !item.completed } })
         }
-        className="mt-0.5"
+        className="mt-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
       >
         {item.completed ? (
-          <CheckSquare className="h-4 w-4 text-emerald-500" />
+          <CheckSquare className="h-4 w-4 text-success" />
         ) : (
-          <span className="block h-4 w-4 rounded border border-muted-foreground/40" />
+          <span className="block h-4 w-4 rounded border border-muted-foreground/40 transition-colors hover:border-primary" />
         )}
       </button>
       <div className="min-w-0 flex-1">
@@ -1125,10 +1191,10 @@ function ChecklistItemRow({
           </button>
         )}
         {(assignee || due) && (
-          <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
             {assignee && (
               <span
-                className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5"
+                className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted px-1.5 py-0.5 font-medium"
                 title={assignee.fullName}
               >
                 <Avatar className="h-3.5 w-3.5">
@@ -1136,14 +1202,16 @@ function ChecklistItemRow({
                     {getInitials(assignee.fullName)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="truncate max-w-[120px]">{assignee.fullName}</span>
+                <span className="max-w-[120px] truncate">{assignee.fullName}</span>
               </span>
             )}
             {due && (
               <span
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5',
-                  overdue ? 'bg-red-100 text-red-800' : 'bg-muted text-muted-foreground',
+                  'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium',
+                  overdue
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'border border-border/60 bg-muted text-muted-foreground',
                 )}
               >
                 <Clock className="h-3 w-3" />
@@ -1165,22 +1233,22 @@ function ChecklistItemRow({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="rounded-md p-1 text-muted-foreground hover:bg-accent"
+              className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               title="Item actions"
               aria-label="Item actions"
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-44 p-1" align="end">
-            <div className="px-2 pt-1 pb-2 text-center text-xs font-semibold">Item actions</div>
+          <PopoverContent className="w-44 max-w-[calc(100vw-2rem)] p-1 shadow-lg" align="end">
+            <div className="px-2 pb-2 pt-1 text-center text-xs font-semibold">Item actions</div>
             <button
               type="button"
               onClick={() => {
                 convert.mutate({ cardId, itemId: item.id });
                 setMenuOpen(false);
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
             >
               <Plus className="h-3.5 w-3.5" /> Convert to card
             </button>
@@ -1190,7 +1258,7 @@ function ChecklistItemRow({
                 remove.mutate({ cardId, itemId: item.id });
                 setMenuOpen(false);
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
@@ -1236,8 +1304,8 @@ function ItemDuePopover({
         <button
           type="button"
           className={cn(
-            'rounded-md p-1 hover:bg-accent',
-            item.dueDate ? 'text-primary' : 'text-muted-foreground',
+            'rounded-lg p-1 transition-colors hover:bg-muted',
+            item.dueDate ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
           )}
           title="Due date"
           aria-label="Due date"
@@ -1245,8 +1313,8 @@ function ItemDuePopover({
           <Clock className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72">
-        <div className="mb-2 text-center text-sm font-semibold">Due date</div>
+      <PopoverContent className="w-72 max-w-[calc(100vw-2rem)] shadow-lg">
+        <div className="mb-3 text-center text-sm font-semibold">Due date</div>
         <Input
           type="datetime-local"
           value={value}
@@ -1291,8 +1359,8 @@ function ItemAssignPopover({
         <button
           type="button"
           className={cn(
-            'rounded-md p-1 hover:bg-accent',
-            item.memberId ? 'text-primary' : 'text-muted-foreground',
+            'rounded-lg p-1 transition-colors hover:bg-muted',
+            item.memberId ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
           )}
           title="Assign"
           aria-label="Assign"
@@ -1300,8 +1368,8 @@ function ItemAssignPopover({
           <UserIcon className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2">
-        <div className="mb-2 text-center text-sm font-semibold">Assign</div>
+      <PopoverContent className="w-64 max-w-[calc(100vw-2rem)] p-2 shadow-lg">
+        <div className="mb-3 text-center text-sm font-semibold">Assign</div>
         {members.length === 0 && (
           <p className="px-1 py-2 text-center text-xs text-muted-foreground">
             No board members yet.
@@ -1315,7 +1383,7 @@ function ItemAssignPopover({
                 key={m._id}
                 type="button"
                 onClick={() => assign(on ? null : m._id)}
-                className="flex w-full items-center gap-2 rounded-md p-1 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 rounded-lg p-1 text-left text-sm transition-colors hover:bg-muted"
               >
                 <Avatar className="h-6 w-6">
                   <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">
@@ -1352,8 +1420,8 @@ function AttachmentsSection({ boardId, card }: { boardId: string; card: Card }) 
 
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Paperclip className="h-4 w-4 text-muted-foreground" />
           Attachments
         </h3>
@@ -1369,7 +1437,13 @@ function AttachmentsSection({ boardId, card }: { boardId: string; card: Card }) 
         />
       </div>
       {attachments.length === 0 ? (
-        <p className="pl-6 text-xs text-muted-foreground">No attachments yet.</p>
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/60 py-6 text-center">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <Paperclip className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium">No attachments yet</p>
+          <p className="text-xs text-muted-foreground">Add files to keep everything in one place.</p>
+        </div>
       ) : (
         <ul className="space-y-2 pl-2">
           {attachments.map((a) => {
@@ -1377,13 +1451,13 @@ function AttachmentsSection({ boardId, card }: { boardId: string; card: Card }) 
             return (
               <li
                 key={a.id}
-                className="flex items-center gap-3 rounded-md border bg-card p-2 text-sm"
+                className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-2 text-sm shadow-xs transition-colors hover:bg-muted/40"
               >
                 <a
                   href={a.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-md bg-muted"
+                  className="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted"
                   title="Open attachment"
                 >
                   {isImg ? (
@@ -1408,7 +1482,7 @@ function AttachmentsSection({ boardId, card }: { boardId: string; card: Card }) 
                 <a
                   href={a.url}
                   download={a.name}
-                  className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"
+                  className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   title="Download"
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -1416,7 +1490,7 @@ function AttachmentsSection({ boardId, card }: { boardId: string; card: Card }) 
                 <button
                   type="button"
                   onClick={() => remove.mutate({ cardId: card._id, attachmentId: a.id })}
-                  className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-destructive"
+                  className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   title="Delete attachment"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -1508,7 +1582,15 @@ function CommentList({
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   if (entries.length === 0)
-    return <p className="text-xs text-muted-foreground">No comments yet.</p>;
+    return (
+      <div className="flex flex-col items-center gap-2 py-6 text-center">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <MoreHorizontal className="h-5 w-5" />
+        </div>
+        <p className="text-sm font-medium">No comments yet</p>
+        <p className="text-xs text-muted-foreground">Start the conversation on this card.</p>
+      </div>
+    );
 
   return (
     <div className="space-y-3">
@@ -1667,18 +1749,18 @@ function CommentRow({
           </div>
         ) : (
           <>
-            <div className="mt-1 whitespace-pre-wrap rounded-md bg-muted/50 p-2 text-sm [overflow-wrap:anywhere]">
+            <div className="mt-1 whitespace-pre-wrap rounded-xl border border-border/60 bg-muted/40 p-3 text-sm [overflow-wrap:anywhere]">
               {comment.body}
             </div>
             {isOwn && (
-              <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-                <button onClick={() => setEditing(true)} className="hover:underline">
+              <div className="mt-1.5 flex gap-3 text-xs text-muted-foreground">
+                <button onClick={() => setEditing(true)} className="font-medium transition-colors hover:text-foreground hover:underline">
                   Edit
                 </button>
                 <span>·</span>
                 <button
                   onClick={() => remove.mutate(comment._id)}
-                  className="hover:text-destructive hover:underline"
+                  className="font-medium transition-colors hover:text-destructive hover:underline"
                 >
                   Delete
                 </button>

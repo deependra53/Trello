@@ -169,6 +169,36 @@ export function useCreateCard(boardId: string) {
   });
 }
 
+/**
+ * Create a card from a chat message. The card's title (channel name), body and
+ * attachments are derived server-side from the message — the client just names
+ * the destination list + source message. Not board-scoped (the caller is in
+ * chat, not on a board), so it refreshes the destination board's cache on success.
+ */
+export function useAddMessageToCard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      listId,
+      messageId,
+      title,
+      description,
+    }: {
+      listId: string;
+      messageId: string;
+      title?: string;
+      description?: string;
+    }) =>
+      api<Card>(`/api/lists/${listId}/cards/from-message`, {
+        method: 'POST',
+        body: { messageId, title, description },
+      }),
+    onSuccess: (card) => {
+      qc.invalidateQueries({ queryKey: ['board', card.boardId] });
+    },
+  });
+}
+
 export function useUpdateCard(boardId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -626,50 +656,18 @@ export function useAddAttachment(boardId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ cardId, file }: { cardId: string; file: File }) => {
-      // 1) Ask backend how to upload. S3/Cloudinary return a presigned PUT URL;
-      //    the local-disk provider returns { provider: 'local' } and we POST multipart instead.
-      const presign = await api<
-        | { uploadUrl: string; publicUrl: string; key: string; expiresIn: number }
-        | { provider: 'local'; method: 'POST' }
-      >(`/api/cards/${cardId}/attachments/sign`, {
-        method: 'POST',
-        body: { name: file.name, mimeType: file.type || 'application/octet-stream' },
-      });
-
-      if (!('uploadUrl' in presign)) {
-        // Local provider — stream the file through the backend.
-        const form = new FormData();
-        form.append('file', file);
-        return api<{ id: string; name: string; url: string }>(
-          `/api/cards/${cardId}/attachments`,
-          { method: 'POST', body: form },
-        );
-      }
-
-      // 2) PUT the file straight to S3 — bytes never touch our server.
-      const putRes = await fetch(presign.uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      });
-      if (!putRes.ok) {
-        throw new Error(`S3 upload failed (${putRes.status})`);
-      }
-
-      // 3) Register the attachment metadata on the card.
+      // Upload through the backend, exactly like chat (uploadChatFile): the server
+      // holds the AWS credentials and PUTs to S3 itself, so this works for every
+      // provider (local/S3/Cloudinary) with no browser→S3 CORS rule on the bucket.
+      const form = new FormData();
+      form.append('file', file);
       return api<{ id: string; name: string; url: string }>(
-        `/api/cards/${cardId}/attachments/register`,
-        {
-          method: 'POST',
-          body: {
-            name: file.name,
-            url: presign.publicUrl,
-            key: presign.key,
-            mimeType: file.type || undefined,
-            size: file.size,
-          },
-        },
+        `/api/cards/${cardId}/attachments`,
+        { method: 'POST', body: form },
       );
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? `Upload failed: ${err.message}` : 'Upload failed');
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['board', boardId] }),
   });

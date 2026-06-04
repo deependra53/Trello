@@ -16,6 +16,7 @@ import {
   YAxis,
 } from 'recharts';
 import { addDays, format, isAfter, isBefore, isToday, subDays } from 'date-fns';
+import { cn } from '@/lib/utils';
 import type { BoardFull, Card } from '@/types/api';
 
 interface Props {
@@ -116,15 +117,15 @@ export function DashboardView({ board }: Props) {
   const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-auto p-4 scrollbar-thin">
-      <div className="grid gap-4 md:grid-cols-4">
+    <div className="flex h-full flex-col gap-4 overflow-auto p-4 pb-24 scrollbar-thin animate-fade-up lg:pb-4">
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
         <Stat label="Total cards" value={total} />
         <Stat label="Lists" value={board.lists.filter((l) => !l.archived).length} />
         <Stat label="Members" value={board.members?.length ?? 0} />
         <Stat label="Completion" value={`${completionPct}%`} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <Panel title="Cards per list">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={cardsPerList}>
@@ -268,11 +269,11 @@ export function DashboardView({ board }: Props) {
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-4 shadow-soft">
+    <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-colors hover:border-border">
       <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-bold tracking-tight">{value}</div>
+      <div className="mt-1.5 text-2xl font-bold tracking-tight md:text-3xl">{value}</div>
     </div>
   );
 }
@@ -288,11 +289,14 @@ function Panel({
 }) {
   return (
     <div
-      className={
-        'rounded-xl border border-border/60 bg-card p-4 shadow-soft ' + (className ?? '')
-      }
+      className={cn(
+        'rounded-xl border border-border/60 bg-card p-4 shadow-sm md:p-5',
+        className,
+      )}
     >
-      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
+      <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h3>
       {children}
     </div>
   );
@@ -300,7 +304,7 @@ function Panel({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid h-[240px] place-items-center text-sm text-muted-foreground">
+    <div className="grid h-[240px] place-items-center text-xs text-muted-foreground">
       {children}
     </div>
   );

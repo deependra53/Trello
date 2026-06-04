@@ -219,15 +219,15 @@ export function BoardFilterPopover({ board, filter, onChange }: Props) {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="flex w-[360px] flex-col gap-4 bg-popover p-0"
+        className="flex w-[min(360px,calc(100vw-1.5rem))] flex-col gap-4 rounded-xl border border-border/60 bg-popover p-0 shadow-xl"
       >
         <div className="flex items-center justify-between px-4 pt-4">
-          <h2 className="text-sm font-semibold">Filter</h2>
+          <h2 className="text-sm font-semibold tracking-tight">Filter</h2>
           {count > 0 && (
             <button
               type="button"
               onClick={() => onChange(emptyFilter)}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground"
+              className="rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               Clear all
             </button>
@@ -429,11 +429,11 @@ export function BoardFilterPopover({ board, filter, onChange }: Props) {
           </Section>
         </div>
 
-        <div className="border-t px-4 py-2.5">
+        <div className="border-t border-border/60 px-4 py-2.5">
           <button
             type="button"
             onClick={() => setMatchOpen((v) => !v)}
-            className="flex w-full items-center justify-between text-sm font-medium text-foreground/90 hover:text-foreground"
+            className="flex w-full items-center justify-between rounded-md text-sm font-medium text-foreground/90 transition-colors hover:text-foreground"
           >
             <span>{filter.match === 'all' ? 'All match' : 'Any match'}</span>
             <ChevronDown
@@ -471,7 +471,7 @@ export function BoardFilterPopover({ board, filter, onChange }: Props) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mt-3 first:mt-1">
-      <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h3>
       <div className="flex flex-col">{children}</div>

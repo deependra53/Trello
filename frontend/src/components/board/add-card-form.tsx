@@ -22,7 +22,7 @@ export function AddCardForm({ boardId, listId }: { boardId: string; listId: stri
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
       >
         <Plus className="h-4 w-4" /> Add a card
       </button>
@@ -30,7 +30,10 @@ export function AddCardForm({ boardId, listId }: { boardId: string; listId: stri
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-2 rounded-lg bg-card p-2 shadow-soft">
+    <form
+      onSubmit={onSubmit}
+      className="animate-scale-in space-y-2 rounded-lg border border-border/60 bg-card p-2 shadow-md"
+    >
       <Textarea
         autoFocus
         placeholder="Enter a title for this card…"

@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'TrelloX — Plan, organize, and ship faster',
+  title: 'IndiHive — Plan, organize, and ship faster',
   description: 'A modern collaborative kanban for teams that build.',
 };
 
